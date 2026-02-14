@@ -43,5 +43,8 @@ class PhysicsEntity:
             
         self.velocity[1] = min(5, self.velocity[1] + 0.1)
         
+        if self.collisions['down'] or self.collisions['up']:
+            self.velocity[1] = 0
+        
     def render(self, surf):
         surf.blit(self.game.assets['player'], self.pos)

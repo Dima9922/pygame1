@@ -15,7 +15,6 @@ class Game:
         self.display = pygame.Surface((400, 300))
 
         # background setup and sound
-        self.bg = load_image("bg.png")
         self.bg_sound = pygame.mixer.Sound("data/sounds/oofoof.mp3")
         self.bg_sound.play()
         # player setup
@@ -26,7 +25,7 @@ class Game:
             'grass': load_images('tiles/grass'),
             'large_decor': load_images('tiles/large_decor'),
             'stone': load_images('tiles/stone'),
-            'player': load_image("16x16/idle1.png")}
+            'player': load_image("entities/player.png")}
         
         self.tilemap = Tilemap(self, tile_size=16)
         
@@ -34,7 +33,7 @@ class Game:
         while True:
             self.tilemap.render(self.display)
             
-            self.player.update(self.tilemap, (self.movement[1] - self.movement[0], 0))
+            self.player.update(self.tilemap, (self.movement[0] - self.movement[1], 0))
             self.player.render(self.display)
  
             # event
@@ -50,26 +49,29 @@ class Game:
                     if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                         self.movement[1] = True
                     if event.key == pygame.K_UP or event.key == pygame.K_w:
-                        self.movement[2] = True
-                    if event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        self.player.velocity[1] = -3
+                        
+                        
+                    """if event.key == pygame.K_DOWN or event.key == pygame.K_s:
                         self.movement[3] = True
                     if event.key == pygame.K_SPACE:
-                        self.bg_sound.stop() or self.bg_sound.play() 
+                        self.bg_sound.stop() or self.bg_sound.play()"""
                       
-                '''if event.type == pygame.KEYUP:
+                if event.type == pygame.KEYUP:
                     if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                         self.movement[0] = False
                     if event.key == pygame.K_LEFT or event.key == pygame.K_a:
-                        self.movement[1] = False
+                        self.movement[1] = False      
                     if event.key == pygame.K_UP or event.key == pygame.K_w:
                         self.movement[2] = False
+                    """
                     if event.key == pygame.K_DOWN or event.key == pygame.K_s:
                         self.movement[3] = False
                     if event.key == pygame.K_SPACE:
-                        self.bg_sound.stop() or self.bg_sound.play()    '''
+                        self.bg_sound.stop() or self.bg_sound.play()"""
                       
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0, 0))
-            self.display.blit(self.bg, (0, 0))
+            self.display.fill("lightblue")
             pygame.display.update()
             self.clock.tick(60)
 Game().run()
