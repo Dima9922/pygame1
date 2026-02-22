@@ -1,7 +1,7 @@
 import sys
 import pygame
-from scripts.entities import PhysicsEntity
-from scripts.utils import load_image, load_images
+from scripts.entities import PhysicsEntity, Player
+from scripts.utils import load_image, load_images, Animation
 from scripts.tilemap import Tilemap
 from scripts.clouds import Clouds
 
@@ -10,17 +10,16 @@ class Game:
         pygame.init()
         pygame.display.set_caption("My Pygame Window")
         pygame.display.set_icon(pygame.image.load("data/images/1.png"))
-        self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((1440, 900), pygame.RESIZABLE)
-        
         self.display = pygame.Surface((400, 300))
-
-        # background setup and sound
+        self.clock = pygame.time.Clock()
+        
+        # background sound
         self.bg_sound = pygame.mixer.Sound("data/sounds/oofoof.mp3")
         self.bg_sound.play()
         # player setup
-        self.movement = [False, False, False, False]
-        self.player = PhysicsEntity(self, "player", (100, 50), (16, 16))
+        self.movement = [False, False]
+        
         self.assets = {
             'decor': load_images('tiles/decor'),
             'grass': load_images('tiles/grass'),
@@ -28,9 +27,16 @@ class Game:
             'stone': load_images('tiles/stone'),
             'player': load_image("entities/player.png"),
             'background': load_image("background.png"),
-            'clouds': load_images('clouds')}
+            'clouds': load_images('clouds'),
+            'player/idle': Animation(load_images('entities/player/idle'), img_dur=6),
+            'player/run': Animation(load_images('entities/player/run'), img_dur=4),
+            'player/jump': Animation(load_images('entities/player/jump')),
+            'player/slide': Animation(load_images('entities/player/slide')),
+            'player/wall_slide': Animation(load_images('entities/player/wall_slide'))}
         
-        self.clouds = Clouds(self.assets['clouds'])
+        self.clouds = Clouds(self.assets['clouds'], count=16)
+        
+        self.player = Player(self, (100, 50), (8, 15))
         
         self.tilemap = Tilemap(self, tile_size=16)
         
@@ -66,8 +72,7 @@ class Game:
                         self.player.velocity[1] = -3
                         
                         
-                    """if event.key == pygame.K_DOWN or event.key == pygame.K_s:
-                        self.movement[3] = True
+                    """
                     if event.key == pygame.K_SPACE:
                         self.bg_sound.stop() or self.bg_sound.play()"""
                       
@@ -76,11 +81,8 @@ class Game:
                         self.movement[0] = False
                     if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                         self.movement[1] = False      
-                    if event.key == pygame.K_UP or event.key == pygame.K_w:
-                        self.movement[2] = False
+                    
                     """
-                    if event.key == pygame.K_DOWN or event.key == pygame.K_s:
-                        self.movement[3] = False
                     if event.key == pygame.K_SPACE:
                         self.bg_sound.stop() or self.bg_sound.play()"""
                       
