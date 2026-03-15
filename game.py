@@ -13,15 +13,14 @@ from scripts.particle import Particle
 class Game:
     def __init__(self):
         pygame.init()
-
         pygame.display.set_caption('ninja game')
-        self.screen = pygame.display.set_mode((1440, 900), pygame.RESIZABLE)
-        self.display = pygame.Surface((320, 240))
-
-        # background sound
+        
         self.bg_sound = pygame.mixer.Sound("data/sounds/oofoof.mp3")
         self.bg_sound.play()
         
+        self.screen = pygame.display.set_mode((1440, 900), pygame.RESIZABLE)
+        self.display = pygame.Surface((320, 240))
+
         self.clock = pygame.time.Clock()
         
         self.movement = [False, False]
@@ -40,6 +39,7 @@ class Game:
             'player/slide': Animation(load_images('entities/player/slide')),
             'player/wall_slide': Animation(load_images('entities/player/wall_slide')),
             'particle/leaf': Animation(load_images('particles/leaf'), img_dur=20, loop=False),
+            'particle/particle': Animation(load_images('particles/particle'), img_dur=6, loop=False),
         }
         
         self.clouds = Clouds(self.assets['clouds'], count=16)
@@ -97,11 +97,14 @@ class Game:
                         self.movement[1] = True
                     if event.key == pygame.K_UP or event.key == pygame.K_w:
                         self.player.jump()
+                    if event.key == pygame.K_x:
+                        self.player.dash()
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                         self.movement[0] = False
                     if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                         self.movement[1] = False
+            
             
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0, 0))
             pygame.display.update()
