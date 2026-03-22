@@ -1,0 +1,5 @@
+{
+    "type": "Статичні блоки",
+    "collision": true,
+    "can_walk": false
+}

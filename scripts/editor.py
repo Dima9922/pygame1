@@ -82,7 +82,7 @@ class Editor:
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
         self.tilemap.render(surface, offset = render_scroll)
         
-        if current_type and is_hovering:
+        if current_type and is_hovering and current_type in self.assets and current_variant < len(self.assets[current_type]):
             current_tile_img = self.assets[current_type][current_variant].copy()
             current_tile_img.set_alpha(150) # Зробив прев'ю трохи виднішим
             

@@ -44,6 +44,11 @@ class NumiViewport(QWidget):
             1030: pygame.K_s, 1042: pygame.K_d  # І = S, В = D
         }
 
+    def set_current_tile(self, group, variant):
+        """Встановлює поточний тайл для малювання"""
+        self.current_tile_group = group
+        self.current_tile_variant = variant
+        
     def set_mode(self, new_mode):
         self.mode = new_mode
         if self.mode == "PLAY":
@@ -130,7 +135,8 @@ class NumiViewport(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         data = pygame.image.tostring(self.display, 'RGB')
-        img = QImage(data, self.display.get_width(), self.display.get_height(), QImage.Format_RGB888)
+        bytes_per_line = self.display.get_width() * 3
+        img = QImage(data, self.display.get_width(), self.display.get_height(), bytes_per_line, QImage.Format_RGB888)
         
         # МАГІЯ МАСШТАБУВАННЯ: Розтягуємо на весь екран зі збереженням пропорцій
         scaled_img = img.scaled(self.size(), Qt.KeepAspectRatio, Qt.FastTransformation)

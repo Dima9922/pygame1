@@ -1,34 +1,24 @@
 import os
 import pygame
-import tkinter as tk
-from tkinter import simpledialog, filedialog
 
 BASE_IMG_PATH = 'data/images/'
+valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.webp')
 
 def load_image(path):
+    if not path.lower().endswith(valid_extensions):
+        return None
     img = pygame.image.load(BASE_IMG_PATH + path).convert()
     img.set_colorkey((0, 0, 0))
     return img
 
 def load_images(path):
     images = []
-    for img_name in sorted(os.listdir(BASE_IMG_PATH + path)):
-        images.append(load_image(path + '/' + img_name))
+    files = [f for f in sorted(os.listdir(BASE_IMG_PATH + path)) if f.lower().endswith(valid_extensions)]
+    for img_name in files:
+        img = load_image(path + '/' + img_name)
+        if img is not None:
+            images.append(img)
     return images
-
-def ask_for_string(title, prompt):
-    root = tk.Tk()
-    root.withdraw()
-    result = simpledialog.askstring(title, prompt)
-    root.destroy()
-    return result
-
-def ask_for_file(title, filetypes):
-    root = tk.Tk()
-    root.withdraw()
-    path = filedialog.askopenfilename(title=title, filetypes=filetypes)
-    root.destroy()
-    return path
     
 class Animation:
     def __init__(self, images, img_dur=5, loop=True):
