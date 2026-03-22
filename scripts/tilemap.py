@@ -25,7 +25,7 @@ class Tilemap:
         self.tilemap = {}
         self.offgrid_tiles = []
         
-    def extract(self, id_pairs, keep=False):
+    def extract(self, id_pairs, keep = False):
         matches = []
         for tile in self.offgrid_tiles.copy():
             if (tile['type'], tile['variant']) in id_pairs:
@@ -33,7 +33,8 @@ class Tilemap:
                 if not keep:
                     self.offgrid_tiles.remove(tile)
                     
-        for loc in self.tilemap:
+        # --- ФІКС ТУТ: Робимо список ключів, щоб можна було безпечно видаляти ---
+        for loc in list(self.tilemap.keys()):
             tile = self.tilemap[loc]
             if (tile['type'], tile['variant']) in id_pairs:
                 matches.append(tile.copy())
@@ -41,7 +42,7 @@ class Tilemap:
                 matches[-1]['pos'][0] *= self.tile_size
                 matches[-1]['pos'][1] *= self.tile_size
                 if not keep:
-                    del self.tilemap[loc]
+                    del self.tilemap[loc] # Тепер видалення не зламає цикл!
         
         return matches
     
