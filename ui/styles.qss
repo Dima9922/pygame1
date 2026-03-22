@@ -1,0 +1,71 @@
+/* Головне вікно */
+QMainWindow, QWidget {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    font-family: "Segoe UI", sans-serif;
+}
+
+/* Панелі */
+QFrame#Toolbar {
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #333;
+}
+
+QTreeView {
+    background-color: #252525;
+    border: none;
+    outline: 0;
+}
+
+/* Кнопки */
+QPushButton {
+    background-color: #3d3d3d;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 5px 15px;
+    color: white;
+}
+
+QPushButton:hover {
+    background-color: #4d4d4d;
+}
+
+/* СИНЯ КНОПКА (як на макеті) */
+QPushButton#NewFolderBtn {
+    background-color: #0078d7;
+    border: none;
+    font-weight: bold;
+    height: 30px;
+}
+
+QPushButton#NewFolderBtn:hover {
+    background-color: #0086f0;
+}
+
+/* Розділювачі панелей */
+QSplitter::handle {
+    background-color: #333;
+}
+
+/* Список асетів */
+QListWidget {
+    background-color: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    outline: none;
+}
+
+QListWidget::item {
+    color: #bbb;
+    padding: 5px;
+}
+
+QListWidget::item:selected {
+    background-color: #0078d7;
+    color: white;
+    border-radius: 4px;
+}
+
+QListWidget::item:hover {
+    background-color: #333;
+}

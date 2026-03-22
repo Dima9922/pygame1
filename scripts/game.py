@@ -58,7 +58,7 @@ class Game:
             self.sfx['jump'].set_volume(0.7)
             self.sfx['ambience'].play(-1)
             
-            pygame.mixer.music.load('data/music.wav')
+            pygame.mixer.music.load('data/sounds/oofoof.mp3')
             pygame.mixer.music.set_volume(0.5)
             pygame.mixer.music.play(-1)
         except:

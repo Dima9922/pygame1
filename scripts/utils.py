@@ -1,6 +1,7 @@
 import os
-
 import pygame
+import tkinter as tk
+from tkinter import simpledialog, filedialog
 
 BASE_IMG_PATH = 'data/images/'
 
@@ -15,6 +16,20 @@ def load_images(path):
         images.append(load_image(path + '/' + img_name))
     return images
 
+def ask_for_string(title, prompt):
+    root = tk.Tk()
+    root.withdraw()
+    result = simpledialog.askstring(title, prompt)
+    root.destroy()
+    return result
+
+def ask_for_file(title, filetypes):
+    root = tk.Tk()
+    root.withdraw()
+    path = filedialog.askopenfilename(title=title, filetypes=filetypes)
+    root.destroy()
+    return path
+    
 class Animation:
     def __init__(self, images, img_dur=5, loop=True):
         self.images = images
