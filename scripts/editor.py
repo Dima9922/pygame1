@@ -70,7 +70,11 @@ class Editor:
                 
             for tile in self.tilemap.offgrid_tiles.copy():
                 tile_img = self.assets[tile['type']][tile['variant']]
-                tile_r = pygame.Rect(tile['pos'][0] - render_scroll[0], tile['pos'][1] - render_scroll[1], tile_img.get_width(), tile_img.get_height())
+                tile_r = pygame.Rect(
+                    tile['pos'][0] - render_scroll[0] - tile_img.get_width() / 2, 
+                    tile['pos'][1] - render_scroll[1] - tile_img.get_height() / 2, 
+                    tile_img.get_width(), 
+                    tile_img.get_height())
                 if tile_r.collidepoint(mpos_virtual):
                     self.tilemap.offgrid_tiles.remove(tile)
 

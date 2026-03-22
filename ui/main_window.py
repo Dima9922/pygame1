@@ -3,7 +3,7 @@ import pygame
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QTreeView, QFrame, 
                              QSplitter, QPushButton, QLabel,
-                             QListWidget, QListWidgetItem)
+                             QListWidget, QListWidgetItem, QApplication)
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QImage
 from ui.pygame_widget import NumiViewport 
@@ -31,6 +31,8 @@ class MainWindow(QMainWindow):
         
         self.btn_save = QPushButton("Save Map")
         self.btn_play = QPushButton("▶ PLAY")
+        self.btn_save.clicked.connect(self.on_save_clicked)
+        self.btn_play.clicked.connect(self.on_play_clicked)
         
         self.toolbar_layout.addWidget(self.btn_save)
         self.toolbar_layout.addStretch()
@@ -121,6 +123,35 @@ class MainWindow(QMainWindow):
         folder_name = self.tree_model.itemFromIndex(folder_index).text()
         self.viewport.set_current_tile(folder_name, tile_index)
 
+    def on_save_clicked(self):
+        """Зберігає мапу у файл"""
+        self.viewport.editor.tilemap.save('map.json')
+        print("Мапу успішно збережено в map.json!")
+        # Тут можна додати спливаюче вікно про успішне збереження пізніше
+
+    def on_play_clicked(self):
+        if self.btn_play.text() == "▶ PLAY":
+            self.btn_play.setText("■ STOP")
+            self.btn_play.setStyleSheet("background-color: #d73a49; color: white; font-weight: bold;")
+            
+            self.sidebar.hide()
+            self.browser_panel.hide()
+            
+            # ДОДАЙ ЦЕЙ РЯДОК: Змушує Qt миттєво розтягнути вікно перед створенням гри
+            QApplication.processEvents() 
+            
+            self.viewport.set_mode("PLAY")
+            self.viewport.setFocus()
+            
+        else:
+            self.btn_play.setText("▶ PLAY")
+            self.btn_play.setStyleSheet("")
+            
+            self.sidebar.show()
+            self.browser_panel.show()
+            
+            self.viewport.set_mode("EDITOR")
+    
     def load_stylesheet(self):
         try:
             with open("ui/styles.qss", "r", encoding="utf-8") as f:
