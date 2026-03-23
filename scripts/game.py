@@ -23,11 +23,21 @@ class Game:
                     self.tile_properties[folder] = json.load(f)
             else:
                 if folder in ['spawners', 'player']:
-                    self.tile_properties[folder] = {"type": "Spawner", "preset": "Player"}
+                    self.tile_properties[folder] = {
+                        "type": "Spawner", "preset": "Player", "anim_idle": "player/idle", 
+                        "anim_walk": "player/run", "anim_jump": "player/jump", 
+                        "anim_dash": "player/slide", "anim_wall_slide": "player/wall_slide",
+                        "weapon_img": "gun.png", "projectile_img": "projectile.png"
+                    }
                 elif 'decor' in folder or folder == 'clouds':
                     self.tile_properties[folder] = {"type": "Static Blocks", "collision": False, "is_visible": True}
                 elif 'enemy' in folder:
-                    self.tile_properties[folder] = {"type": "Spawner", "preset": "Enemy", "can_walk": True, "can_shoot": True, "walk_speed": 1.0, "shoot_cooldown": 60}
+                    self.tile_properties[folder] = {
+                        "type": "Spawner", "preset": "Enemy", "anim_idle": "enemy/idle", 
+                        "anim_walk": "enemy/run", "can_walk": True, "can_shoot": True, 
+                        "walk_speed": 1.0, "shoot_cooldown": 60, "weapon_img": "gun.png", 
+                        "projectile_img": "projectile.png", "vision_range": 15
+                    }
                 else:
                     self.tile_properties[folder] = {"type": "Static Blocks", "collision": True, "is_visible": True}
                 
@@ -36,21 +46,27 @@ class Game:
         self.movement = [False, False]
         
         self.assets.update({
-            'player': load_image('entities/player.png'),
             'background': load_image('background.png'),
             'clouds': load_images('clouds'),
-            'enemy/idle': Animation(load_images('entities/enemy/idle'), img_dur = 6),
-            'enemy/run': Animation(load_images('entities/enemy/run'), img_dur = 4),
-            'player/idle': Animation(load_images('entities/player/idle'), img_dur = 6),
-            'player/run': Animation(load_images('entities/player/run'), img_dur = 4),
-            'player/jump': Animation(load_images('entities/player/jump')),
-            'player/slide': Animation(load_images('entities/player/slide')),
-            'player/wall_slide': Animation(load_images('entities/player/wall_slide')),
             'particle/leaf': Animation(load_images('particles/leaf'), img_dur = 20, loop = False),
             'particle/particle': Animation(load_images('particles/particle'), img_dur = 6, loop = False),
             'gun': load_image('gun.png'),
             'projectile': load_image('projectile.png'),
         })
+        
+        entities_base_path = 'data/images/entities'
+        if os.path.exists(entities_base_path):
+            for ent in os.listdir(entities_base_path):
+                full_ent_path = os.path.join(entities_base_path, ent)
+                if os.path.isdir(full_ent_path):
+                    for action in os.listdir(full_ent_path):
+                        action_path = os.path.join(full_ent_path, action)
+                        if os.path.isdir(action_path):
+                            img_dur = 4 if action in ['run', 'walk', 'slide'] else 6
+                            rel_path = f'entities/{ent}/{action}'
+                            self.assets[f'{ent}/{action}'] = Animation(load_images(rel_path), img_dur=img_dur)
+                        elif action.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.webp')):
+                            self.assets[f'{ent}/{action}'] = load_image(f'entities/{ent}/{action}')
         
         self.assets['background'] = pygame.transform.scale(self.assets['background'], (v_width, v_height))
         
@@ -75,7 +91,8 @@ class Game:
             self.sfx = None
         
         self.clouds = Clouds(self.assets['clouds'], count = 16)
-        self.player = Player(self, (50, 50), (8, 15))
+        
+        self.player = Player(self, (50, 50), (8, 15), anim_paths={'idle': 'player/idle'})
         self.tilemap = Tilemap(self, tile_size = 16)
         
         self.screenshake = 0
@@ -96,6 +113,16 @@ class Game:
             folder = spawner['type'] 
             props = self.tile_properties.get(folder, {})
             preset = props.get('preset', 'Enemy') 
+            
+            anim_paths = {
+                'idle': props.get('anim_idle', 'enemy/idle'),
+                'run': props.get('anim_walk', 'enemy/run'),
+                'jump': props.get('anim_jump', 'player/jump'),
+                'slide': props.get('anim_dash', 'player/slide'),
+                'wall_slide': props.get('anim_wall_slide', 'player/wall_slide'),
+                'weapon_img': props.get('weapon_img', 'gun'),
+                'projectile_img': props.get('projectile_img', 'projectile')
+            }
 
             if preset == "Player":
                 self.player.pos = list(spawner['pos'])
@@ -104,7 +131,9 @@ class Game:
                 self.player.air_time = 0
                 self.dead = 0
                 
-                # ПЕРЕДАЄМО НОВІ ГАЛОЧКИ ГРАВЦЮ
+                self.player.anim_paths = anim_paths
+                self.player.set_action('idle') 
+                
                 self.player.speed = props.get('walk_speed', 1.0)
                 self.player.jump_height = props.get('jump_height', 3)
                 self.player.can_jump = props.get('can_jump', True) 
@@ -116,10 +145,12 @@ class Game:
             elif preset == "Enemy":
                 self.enemies.append(Enemy(
                     self, spawner['pos'], (8, 15),
+                    anim_paths=anim_paths,
                     can_walk=props.get('can_walk', False),
                     can_shoot=props.get('can_shoot', False),
                     speed=props.get('walk_speed', 1.0),
-                    shoot_cooldown_max=props.get('shoot_cooldown', 60) 
+                    shoot_cooldown_max=props.get('shoot_cooldown', 60),
+                    vision_range=props.get('vision_range', 15) * 16 # Переводимо блоки в пікселі
                 ))
             
         self.projectiles = []
@@ -174,11 +205,9 @@ class Game:
             elif projectile[2] > 360:
                 self.projectiles.remove(projectile)
             else:
-                # МАГІЯ: Перевіряємо, чия це куля
                 proj_type = projectile[3] if len(projectile) > 3 else 'enemy'
                 
                 if proj_type == 'enemy':
-                    # Ворожа куля вбиває гравця
                     if abs(self.player.dashing) < 50:
                         if self.player.rect().collidepoint(projectile[0]):
                             self.projectiles.remove(projectile)
@@ -189,10 +218,9 @@ class Game:
                                 angle = random.random() * math.pi * 2
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(self.player.rect().center, angle, 2 + random.random()))
-                                self.particles.append(Particle(self, 'particle', self.player.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = random.randint(0, 7)))
+                                self.particles.append(Particle(self, 'particle/particle', self.player.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = random.randint(0, 7)))
                 
                 elif proj_type == 'player':
-                    # Куля гравця вбиває ворогів
                     for enemy in self.enemies.copy():
                         if enemy.rect().collidepoint(projectile[0]):
                             if projectile in self.projectiles:
@@ -205,7 +233,7 @@ class Game:
                                 angle = random.random() * math.pi * 2
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
-                                self.particles.append(Particle(self, 'particle', enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = random.randint(0, 7)))
+                                self.particles.append(Particle(self, 'particle/particle', enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = random.randint(0, 7)))
                             break 
                     
         for spark in self.sparks.copy():
@@ -231,7 +259,6 @@ class Game:
                         if self.sfx: self.sfx['jump'].play()
                 if event.key == pygame.K_x:
                     self.player.dash()
-                # ПОСТРІЛ НА ПРОБІЛ
                 if event.key == pygame.K_SPACE:
                     self.player.shoot()
                     
@@ -257,7 +284,9 @@ class Game:
             self.player.render(self.display, offset = render_scroll)
             
         for projectile in self.projectiles:
-            img = self.assets['projectile']
+            img_key = projectile[4] if len(projectile) > 4 else 'projectile'
+            img = self.assets.get(img_key, self.assets.get('projectile'))
+            
             self.display.blit(img, (projectile[0][0] - img.get_width() / 2 - render_scroll[0], projectile[0][1] - img.get_height() / 2 - render_scroll[1]))
             
         for spark in self.sparks:

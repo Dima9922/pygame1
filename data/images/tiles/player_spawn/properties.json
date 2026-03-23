@@ -1,6 +1,13 @@
 {
     "type": "Spawner",
     "preset": "Player",
+    "anim_idle": "player/idle",
+    "anim_walk": "player/run",
+    "anim_jump": "player/jump",
+    "anim_dash": "player/dash",
+    "anim_wall_slide": "player/wall_slide",
+    "weapon_img": "parcticles/guns/gun.png",
+    "projectile_img": "parcticles/bullets/projectile.png",
     "collision": false,
     "is_visible": true,
     "can_walk": true,

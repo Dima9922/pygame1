@@ -1,3 +1,5 @@
+import os
+import json
 import pygame
 from scripts.tilemap import Tilemap
 
@@ -5,6 +7,16 @@ class Editor:
     def __init__(self, assets):
         self.assets = assets
         self.movement = [False, False, False, False]
+        
+        # ФІКС: Завантажуємо властивості для Редактора
+        self.tile_properties = {}
+        if os.path.exists('data/images/tiles'):
+            for folder in os.listdir('data/images/tiles'):
+                prop_path = f'data/images/tiles/{folder}/properties.json'
+                if os.path.exists(prop_path):
+                    with open(prop_path, 'r', encoding='utf-8') as f:
+                        self.tile_properties[folder] = json.load(f)
+                    
         self.tilemap = Tilemap(self, tile_size = 16)
         
         try:
@@ -35,7 +47,6 @@ class Editor:
                         img = self.assets[current_type][current_variant]
                         pos_x = mpos_virtual[0] + render_scroll[0] - img.get_width() / 2
                         pos_y = mpos_virtual[1] + render_scroll[1] - img.get_height() / 2
-                        # ФІКС: Використовуємо квадратні дужки [pos_x, pos_y] замість круглих!
                         self.tilemap.offgrid_tiles.append({'type': current_type, 'variant': current_variant, 'pos': [pos_x, pos_y]})
                 if event.button == 3 and is_hovering:
                     self.right_clicking = True

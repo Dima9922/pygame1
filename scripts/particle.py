@@ -4,7 +4,15 @@ class Particle:
         self.type = p_type
         self.pos = list(pos)
         self.velocity = list(velocity)
-        self.animation = self.game.assets['particle/' + p_type].copy()
+        
+        # Підтримка як нових кастомних шляхів, так і старих базових
+        if p_type in self.game.assets:
+            self.animation = self.game.assets[p_type].copy()
+        else:
+            self.animation = self.game.assets['particle/' + p_type].copy()
+            
+        # ФІКС: Примусово вимикаємо зациклення, щоб частинка зникала після одного програвання
+        self.animation.loop = False 
         self.animation.frame = frame
     
     def update(self):
@@ -22,4 +30,3 @@ class Particle:
     def render(self, surf, offset=(0, 0)):
         img = self.animation.img()
         surf.blit(img, (self.pos[0] - offset[0] - img.get_width() // 2, self.pos[1] - offset[1] - img.get_height() // 2))
-    

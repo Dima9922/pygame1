@@ -1,13 +1,11 @@
 import math
 import random
-
 import pygame
-
 from scripts.particle import Particle
 from scripts.spark import Spark
 
 class PhysicsEntity:
-    def __init__(self, game, e_type, pos, size):
+    def __init__(self, game, e_type, pos, size, anim_paths=None):
         self.game = game
         self.type = e_type
         self.pos = list(pos)
@@ -16,8 +14,13 @@ class PhysicsEntity:
         self.collisions = {'up': False, 'down': False, 'right': False, 'left': False}
         
         self.action = ''
-        self.anim_offset = (-3, -3)
         self.flip = False
+        
+        # Зміщуємо картинку вище, щоб персонаж не провалювався в землю
+        self.anim_offset = (-3, -5) 
+        
+        # Словник з кастомними шляхами для кожної дії
+        self.anim_paths = anim_paths or {'idle': f'{e_type}/idle', 'run': f'{e_type}/run'}
         self.set_action('idle')
         
         self.last_movement = [0, 0]
@@ -28,7 +31,13 @@ class PhysicsEntity:
     def set_action(self, action):
         if action != self.action:
             self.action = action
-            self.animation = self.game.assets[self.type + '/' + self.action].copy()
+            
+            # Шукаємо шлях у словнику. Якщо немає — беремо idle
+            anim_key = self.anim_paths.get(action, self.anim_paths.get('idle', ''))
+            if anim_key in self.game.assets:
+                self.animation = self.game.assets[anim_key].copy()
+            else:
+                print(f"ПОПЕРЕДЖЕННЯ: Анімацію '{anim_key}' не знайдено!")
         
     def update(self, tilemap, movement=(0, 0)):
         self.collisions = {'up': False, 'down': False, 'right': False, 'left': False}
@@ -71,16 +80,19 @@ class PhysicsEntity:
         if self.collisions['down'] or self.collisions['up']:
             self.velocity[1] = 0
             
-        self.animation.update()
+        if hasattr(self, 'animation'):
+            self.animation.update()
         
     def render(self, surf, offset=(0, 0)):
-        surf.blit(pygame.transform.flip(self.animation.img(), self.flip, False), (self.pos[0] - offset[0] + self.anim_offset[0], self.pos[1] - offset[1] + self.anim_offset[1]))
+        if hasattr(self, 'animation'):
+            surf.blit(pygame.transform.flip(self.animation.img(), self.flip, False), (self.pos[0] - offset[0] + self.anim_offset[0], self.pos[1] - offset[1] + self.anim_offset[1]))
         
 
 class Enemy(PhysicsEntity):
-    def __init__(self, game, pos, size, can_walk=True, can_shoot=True, speed=1.0, shoot_cooldown_max=60):
-        super().__init__(game, 'enemy', pos, size)
+    def __init__(self, game, pos, size, anim_paths=None, can_walk=True, can_shoot=True, speed=1.0, shoot_cooldown_max=60, vision_range=250):
+        super().__init__(game, 'enemy', pos, size, anim_paths)
         
+        self.vision_range = vision_range
         self.can_walk = can_walk
         self.can_shoot = can_shoot
         self.speed = speed  
@@ -95,7 +107,7 @@ class Enemy(PhysicsEntity):
                 angle = random.random() * math.pi * 2
                 speed = random.random() * 5
                 self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
-                self.game.particles.append(Particle(self.game, 'particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+                self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
             return True
             
         if self.shoot_cooldown > 0:
@@ -116,24 +128,30 @@ class Enemy(PhysicsEntity):
         
         if self.can_shoot:
             dis = (self.game.player.pos[0] - self.pos[0], self.game.player.pos[1] - self.pos[1])
-            if (abs(dis[1]) < 16) and (abs(dis[0]) < 250):
-                if self.shoot_cooldown == 0: 
-                    # ФІКС: Додано помітку 'enemy' до кулі
-                    if (self.flip and dis[0] < 0):
-                        if self.game.sfx: self.game.sfx['shoot'].play()
-                        self.game.projectiles.append([[self.rect().centerx - 7, self.rect().centery], -1.5, 0, 'enemy'])
-                        for i in range(4):
-                            self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5 + math.pi, 2 + random.random()))
-                        self.shoot_cooldown = self.shoot_cooldown_max 
-                        self.walking = 0 
+            
+            # Перевіряємо чи гравець в радіусі зору (по Y і X)
+            if (abs(dis[1]) < 16) and (abs(dis[0]) < self.vision_range):
+                # Перевіряємо чи немає стін між ворогами
+                if tilemap.check_line_of_sight(self.rect().center, self.game.player.rect().center):
+                    if self.shoot_cooldown == 0: 
+                        # Визначаємо текстуру кулі для ворога
+                        proj_img = self.anim_paths.get('projectile_img', 'projectile')
                         
-                    elif (not self.flip and dis[0] > 0):
-                        if self.game.sfx: self.game.sfx['shoot'].play()
-                        self.game.projectiles.append([[self.rect().centerx + 7, self.rect().centery], 1.5, 0, 'enemy'])
-                        for i in range(4):
-                            self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5, 2 + random.random()))
-                        self.shoot_cooldown = self.shoot_cooldown_max 
-                        self.walking = 0 
+                        if (self.flip and dis[0] < 0):
+                            if self.game.sfx: self.game.sfx['shoot'].play()
+                            self.game.projectiles.append([[self.rect().centerx - 7, self.rect().centery], -1.5, 0, 'enemy', proj_img])
+                            for i in range(4):
+                                self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5 + math.pi, 2 + random.random()))
+                            self.shoot_cooldown = self.shoot_cooldown_max 
+                            self.walking = 0 
+                            
+                        elif (not self.flip and dis[0] > 0):
+                            if self.game.sfx: self.game.sfx['shoot'].play()
+                            self.game.projectiles.append([[self.rect().centerx + 7, self.rect().centery], 1.5, 0, 'enemy', proj_img])
+                            for i in range(4):
+                                self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5, 2 + random.random()))
+                            self.shoot_cooldown = self.shoot_cooldown_max 
+                            self.walking = 0 
         
         super().update(tilemap, movement=movement)
         
@@ -150,7 +168,7 @@ class Enemy(PhysicsEntity):
                     angle = random.random() * math.pi * 2
                     speed = random.random() * 5
                     self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
-                    self.game.particles.append(Particle(self.game, 'particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+                    self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
                 self.game.sparks.append(Spark(self.rect().center, 0, 5 + random.random()))
                 self.game.sparks.append(Spark(self.rect().center, math.pi, 5 + random.random()))
                 return True
@@ -158,14 +176,18 @@ class Enemy(PhysicsEntity):
     def render(self, surf, offset=(0, 0)):
         super().render(surf, offset=offset)
         
-        if self.flip:
-            surf.blit(pygame.transform.flip(self.game.assets['gun'], True, False), (self.rect().centerx - 4 - self.game.assets['gun'].get_width() - offset[0], self.rect().centery - offset[1]))
-        else:
-            surf.blit(self.game.assets['gun'], (self.rect().centerx + 4 - offset[0], self.rect().centery - offset[1]))
+        if self.can_shoot:
+            weapon_key = self.anim_paths.get('weapon_img', 'gun')
+            weapon_img = self.game.assets.get(weapon_key, self.game.assets.get('gun'))
+            
+            if self.flip:
+                surf.blit(pygame.transform.flip(weapon_img, True, False), (self.rect().centerx - 4 - weapon_img.get_width() - offset[0], self.rect().centery - offset[1]))
+            else:
+                surf.blit(weapon_img, (self.rect().centerx + 4 - offset[0], self.rect().centery - offset[1]))
 
 class Player(PhysicsEntity):
-    def __init__(self, game, pos, size):
-        super().__init__(game, 'player', pos, size)
+    def __init__(self, game, pos, size, anim_paths=None):
+        super().__init__(game, 'player', pos, size, anim_paths)
         self.air_time = 0
         self.jumps = 1
         self.wall_slide = False
@@ -174,7 +196,6 @@ class Player(PhysicsEntity):
         self.speed = 1.0
         self.jump_height = 3.0
         
-        # НОВІ ПАРАМЕТРИ
         self.can_jump = True 
         self.can_wall_jump = True 
         self.can_shoot = False
@@ -194,7 +215,7 @@ class Player(PhysicsEntity):
                     angle = random.random() * math.pi * 2
                     speed = random.random() * 5
                     self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
-                    self.game.particles.append(Particle(self.game, 'particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+                    self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
             self.game.dead += 1
             
         movement = (movement[0] * self.speed, movement[1])
@@ -208,7 +229,8 @@ class Player(PhysicsEntity):
             self.jumps = 1
             
         self.wall_slide = False
-        if (self.collisions['right'] or self.collisions['left']) and self.air_time > 4:
+        # Перевірка на те, чи дозволено персонажу ковзати по стіні
+        if (self.collisions['right'] or self.collisions['left']) and self.air_time > 4 and self.can_wall_jump:
             self.wall_slide = True
             self.velocity[1] = min(self.velocity[1], 0.5)
             if self.collisions['right']:
@@ -218,19 +240,24 @@ class Player(PhysicsEntity):
             self.set_action('wall_slide')
         
         if not self.wall_slide:
-            if self.air_time > 4:
+            if abs(self.dashing) > 50: 
+                self.set_action('slide')
+            elif self.air_time > 4:
                 self.set_action('jump')
             elif movement[0] != 0:
                 self.set_action('run')
             else:
                 self.set_action('idle')
         
+        # Оскільки частинки і є анімацією тіла, беремо єдиний шлях з 'slide' (поле Dash Anim)
+        dash_p_type = self.anim_paths.get('slide', 'particle/particle')
+        
         if abs(self.dashing) in {60, 50}:
             for i in range(20):
                 angle = random.random() * math.pi * 2
                 speed = random.random() * 0.5 + 0.5
                 pvelocity = [math.cos(angle) * speed, math.sin(angle) * speed]
-                self.game.particles.append(Particle(self.game, 'particle', self.rect().center, velocity=pvelocity, frame=random.randint(0, 7)))
+                self.game.particles.append(Particle(self.game, dash_p_type, self.rect().center, velocity=pvelocity, frame=random.randint(0, 7)))
         if self.dashing > 0:
             self.dashing = max(0, self.dashing - 1)
         if self.dashing < 0:
@@ -240,7 +267,7 @@ class Player(PhysicsEntity):
             if abs(self.dashing) == 51:
                 self.velocity[0] *= 0.1
             pvelocity = [abs(self.dashing) / self.dashing * random.random() * 3, 0]
-            self.game.particles.append(Particle(self.game, 'particle', self.rect().center, velocity=pvelocity, frame=random.randint(0, 7)))
+            self.game.particles.append(Particle(self.game, dash_p_type, self.rect().center, velocity=pvelocity, frame=random.randint(0, 7)))
                 
         if self.velocity[0] > 0:
             self.velocity[0] = max(self.velocity[0] - 0.1, 0)
@@ -248,15 +275,16 @@ class Player(PhysicsEntity):
             self.velocity[0] = min(self.velocity[0] + 0.1, 0)
             
     def shoot(self):
-        # ЛОГІКА СТРІЛЬБИ ГРАВЦЯ
         if self.can_shoot and self.shoot_cooldown == 0:
+            proj_img = self.anim_paths.get('projectile_img', 'projectile')
+            
             if self.game.sfx: self.game.sfx['shoot'].play()
             if self.flip:
-                self.game.projectiles.append([[self.rect().centerx - 7, self.rect().centery], -1.5, 0, 'player'])
+                self.game.projectiles.append([[self.rect().centerx - 7, self.rect().centery], -1.5, 0, 'player', proj_img])
                 for i in range(4):
                     self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5 + math.pi, 2 + random.random()))
             else:
-                self.game.projectiles.append([[self.rect().centerx + 7, self.rect().centery], 1.5, 0, 'player'])
+                self.game.projectiles.append([[self.rect().centerx + 7, self.rect().centery], 1.5, 0, 'player', proj_img])
                 for i in range(4):
                     self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5, 2 + random.random()))
             self.shoot_cooldown = self.shoot_cooldown_max 
@@ -267,15 +295,17 @@ class Player(PhysicsEntity):
         if abs(self.dashing) <= 50:
             super().render(surf, offset=offset)
             
-            # МАЛЮЄМО ПІСТОЛЕТ ГРАВЦЮ
             if self.can_shoot:
+                weapon_key = self.anim_paths.get('weapon_img', 'gun')
+                weapon_img = self.game.assets.get(weapon_key, self.game.assets.get('gun'))
+                
                 if self.flip:
-                    surf.blit(pygame.transform.flip(self.game.assets['gun'], True, False), (self.rect().centerx - 4 - self.game.assets['gun'].get_width() - offset[0], self.rect().centery - offset[1]))
+                    surf.blit(pygame.transform.flip(weapon_img, True, False), (self.rect().centerx - 4 - weapon_img.get_width() - offset[0], self.rect().centery - offset[1]))
                 else:
-                    surf.blit(self.game.assets['gun'], (self.rect().centerx + 4 - offset[0], self.rect().centery - offset[1]))
+                    surf.blit(weapon_img, (self.rect().centerx + 4 - offset[0], self.rect().centery - offset[1]))
             
     def jump(self):
-        if not self.can_jump: # ФІКС: Блокування стрибка
+        if not self.can_jump: 
             return False
             
         if self.wall_slide and self.can_wall_jump:
@@ -302,7 +332,7 @@ class Player(PhysicsEntity):
             return True
     
     def dash(self):
-        if not self.can_dash: # ФІКС: Блокування ривка
+        if not self.can_dash: 
             return False
             
         if not self.dashing:

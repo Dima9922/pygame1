@@ -1,6 +1,13 @@
 {
     "type": "Spawner",
     "preset": "Enemy",
+    "anim_idle": "enemy/idle",
+    "anim_walk": "enemy/run",
+    "anim_jump": "player/jump",
+    "anim_dash": "player/slide",
+    "anim_wall_slide": "player/wall_slide",
+    "weapon_img": "parcticles/guns/gun.png",
+    "projectile_img": "particles/bullets/projectile.png",
     "collision": false,
     "is_visible": true,
     "can_walk": true,
@@ -10,5 +17,6 @@
     "can_dash": true,
     "walk_speed": 1.0,
     "jump_height": 3,
-    "shoot_cooldown": 60
+    "shoot_cooldown": 90,
+    "vision_range": 3
 }
