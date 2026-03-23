@@ -5,14 +5,18 @@ BASE_IMG_PATH = 'data/images/'
 valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.webp')
 
 def load_image(path):
-    if not path.lower().endswith(valid_extensions):
+    # Додано перевірку: якщо файлу немає, просто тихо повертаємо None
+    full_path = BASE_IMG_PATH + path
+    if not os.path.exists(full_path):
         return None
+        
     try:
-        img = pygame.image.load(BASE_IMG_PATH + path).convert()
+        img = pygame.image.load(full_path).convert()
         img.set_colorkey((0, 0, 0))
         return img
     except Exception as e:
-        print(f"Помилка завантаження {path}: {e}")
+        # Пишемо помилку тільки якщо файл є, але він битий
+        print(f"Помилка файлу {path}: {e}")
         return None
 
 def load_images(path):

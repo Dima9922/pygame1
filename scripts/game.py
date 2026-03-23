@@ -48,10 +48,9 @@ class Game:
         self.assets.update({
             'background': load_image('background.png'),
             'clouds': load_images('clouds'),
-            'particle/leaf': Animation(load_images('particles/leaf'), img_dur = 20, loop = False),
             'particle/particle': Animation(load_images('particles/particle'), img_dur = 6, loop = False),
-            'gun': load_image('gun.png'),
-            'projectile': load_image('projectile.png'),
+            'gun.png': load_image('gun.png'),
+            'projectile.png': load_image('projectile.png'),
         })
         
         entities_base_path = 'data/images/entities'
@@ -104,10 +103,6 @@ class Game:
         except FileNotFoundError:
             pass
             
-        self.leaf_spawners = []
-        for tree in self.tilemap.extract([('large_decor', 2)], keep = True):
-            self.leaf_spawners.append(pygame.Rect(4 + tree['pos'][0], 4 + tree['pos'][1], 23, 13))
-            
         self.enemies = []
         for spawner in self.tilemap.extract_spawners():
             folder = spawner['type'] 
@@ -120,8 +115,8 @@ class Game:
                 'jump': props.get('anim_jump', 'player/jump'),
                 'slide': props.get('anim_dash', 'player/slide'),
                 'wall_slide': props.get('anim_wall_slide', 'player/wall_slide'),
-                'weapon_img': props.get('weapon_img', 'gun'),
-                'projectile_img': props.get('projectile_img', 'projectile')
+                'weapon_img': props.get('weapon_img', 'gun.png'),
+                'projectile_img': props.get('projectile_img', 'projectile.png')
             }
 
             if preset == "Player":
@@ -150,7 +145,7 @@ class Game:
                     can_shoot=props.get('can_shoot', False),
                     speed=props.get('walk_speed', 1.0),
                     shoot_cooldown_max=props.get('shoot_cooldown', 60),
-                    vision_range=props.get('vision_range', 15) * 16 # Переводимо блоки в пікселі
+                    vision_range=props.get('vision_range', 15) * 16 
                 ))
             
         self.projectiles = []
@@ -160,6 +155,29 @@ class Game:
         self.dead = 0
         self.transition = -30
 
+    def get_image(self, key, fallback_key):
+        """Розумне завантаження: шукає в пам'яті, а якщо нема - вантажить з диска"""
+        # Якщо вже є в пам'яті
+        if key in self.assets and self.assets[key] is not None:
+            return self.assets[key]
+            
+        # Якщо вказано файл (наприклад, my_gun.png або player/my_gun.png)
+        if isinstance(key, str) and key.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.webp')):
+            # Пробуємо завантажити як є (з папки data/images/)
+            img = load_image(key)
+            if img:
+                self.assets[key] = img
+                return img
+                
+            # Пробуємо знайти в папці entities (якщо юзер ввів короткий шлях)
+            img = load_image('entities/' + key)
+            if img:
+                self.assets[key] = img
+                return img
+                
+        # Якщо файл взагалі не знайдено - беремо базову картинку
+        return self.assets.get(fallback_key)
+    
     def update(self, events):
         self.screenshake = max(0, self.screenshake - 1)
         
@@ -179,11 +197,6 @@ class Game:
         
         self.scroll[0] += (self.player.rect().centerx - self.display.get_width() / 2 - self.scroll[0]) / 30
         self.scroll[1] += (self.player.rect().centery - self.display.get_height() / 2 - self.scroll[1]) / 30
-        
-        for rect in self.leaf_spawners:
-            if random.random() * 49999 < rect.width * rect.height:
-                pos = (rect.x + random.random() * rect.width, rect.y + random.random() * rect.height)
-                self.particles.append(Particle(self, 'leaf', pos, velocity = [-0.1, 0.3], frame = random.randint(0, 20)))
         
         self.clouds.update()
         
@@ -243,8 +256,6 @@ class Game:
                 
         for particle in self.particles.copy():
             kill = particle.update()
-            if particle.type == 'leaf':
-                particle.pos[0] += math.sin(particle.animation.frame * 0.035) * 0.3
             if kill:
                 self.particles.remove(particle)
 
@@ -284,10 +295,12 @@ class Game:
             self.player.render(self.display, offset = render_scroll)
             
         for projectile in self.projectiles:
-            img_key = projectile[4] if len(projectile) > 4 else 'projectile'
-            img = self.assets.get(img_key, self.assets.get('projectile'))
+            img_key = projectile[4] if len(projectile) > 4 else 'projectile.png'
+            # Використовуємо наш новий розумний пошук
+            img = self.get_image(img_key, 'projectile.png')
             
-            self.display.blit(img, (projectile[0][0] - img.get_width() / 2 - render_scroll[0], projectile[0][1] - img.get_height() / 2 - render_scroll[1]))
+            if img: # Малюємо тільки якщо картинка реально знайдена
+                self.display.blit(img, (projectile[0][0] - img.get_width() / 2 - render_scroll[0], projectile[0][1] - img.get_height() / 2 - render_scroll[1]))
             
         for spark in self.sparks:
             spark.render(self.display, offset = render_scroll)
