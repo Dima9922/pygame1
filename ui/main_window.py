@@ -8,13 +8,14 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout,
                              QSplitter, QPushButton, QLabel,
                              QListWidget, QListWidgetItem,
                              QInputDialog, QFileDialog, QMessageBox, QApplication, 
-                             QMenu, QComboBox, QCheckBox)
+                             QMenu, QComboBox, QCheckBox, QDoubleSpinBox, QSpinBox)
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QImage
 from ui.pygame_widget import NumiViewport 
 from scripts.utils import load_images
 
 valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.webp')
+
 class MainWindow(QMainWindow):
     def __init__(self, assets):
         super().__init__()
@@ -30,7 +31,6 @@ class MainWindow(QMainWindow):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
-        # --- TOOLBAR ---
         self.toolbar = QFrame()
         self.toolbar.setFixedHeight(40)
         self.toolbar.setObjectName("Toolbar")
@@ -47,10 +47,8 @@ class MainWindow(QMainWindow):
         self.toolbar_layout.addStretch()
         self.main_layout.addWidget(self.toolbar)
 
-        # --- ГОЛОВНИЙ РОЗДІЛЮВАЧ ---
         self.horizontal_splitter = QSplitter(Qt.Horizontal)
 
-        # 1. ЛІВА ПАНЕЛЬ (SIDEBAR)
         self.sidebar = QFrame()
         self.sidebar.setMinimumWidth(250)
         self.sidebar_layout = QVBoxLayout(self.sidebar)
@@ -79,15 +77,12 @@ class MainWindow(QMainWindow):
         self.btn_new_folder = QPushButton("+ Folder")
         self.btn_new_folder.setObjectName("NewFolderBtn")
         self.sidebar_layout.addWidget(self.btn_new_folder)
-        
         self.btn_new_folder.clicked.connect(self.on_new_folder_clicked)
         self.btn_add_tiles.clicked.connect(self.on_add_tiles_clicked)
 
-        # 2. ЦЕНТРАЛЬНА ПАНЕЛЬ (VIEWPORT + BROWSER)
         self.center_container = QFrame()
         self.center_layout = QVBoxLayout(self.center_container)
         self.center_layout.setContentsMargins(0, 0, 0, 0)
-        
         self.vertical_splitter = QSplitter(Qt.Vertical)
         
         self.viewport = NumiViewport(self.assets)
@@ -97,77 +92,197 @@ class MainWindow(QMainWindow):
         self.browser_panel.setMinimumHeight(200)
         self.browser_panel.setObjectName("BrowserPanel")
         self.browser_layout = QVBoxLayout(self.browser_panel)
-        self.browser_layout.setContentsMargins(5, 5, 5, 5)
-
         self.asset_list = QListWidget()
         self.asset_list.setViewMode(QListWidget.IconMode)
         self.asset_list.setIconSize(QSize(64, 64))
-        self.asset_list.setResizeMode(QListWidget.Adjust)
-        self.asset_list.setSpacing(10)
-        self.asset_list.setMovement(QListWidget.Static)
-        
-        # ПІДКЛЮЧЕННЯ ТАЙЛІВ ТУТ (після створення asset_list)
         self.asset_list.clicked.connect(self.on_tile_clicked)
         self.asset_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.asset_list.customContextMenuRequested.connect(self.show_tile_context_menu)
-        
         self.browser_layout.addWidget(self.asset_list)
         self.vertical_splitter.addWidget(self.browser_panel)
-        
-        self.vertical_splitter.setStretchFactor(0, 7)
-        self.vertical_splitter.setStretchFactor(1, 3)
         self.center_layout.addWidget(self.vertical_splitter)
 
-        # 3. ПРАВА ПАНЕЛЬ (ВЛАСТИВОСТІ)
+        # --- ПРАВА ПАНЕЛЬ ---
         self.properties_panel = QFrame()
-        self.properties_panel.setMinimumWidth(250)
-        self.properties_panel.setMaximumWidth(300) # Захист від розтягування
+        self.properties_panel.setMinimumWidth(280)
+        self.properties_panel.setMaximumWidth(350)
         self.properties_layout = QVBoxLayout(self.properties_panel)
         
-        self.prop_title = QLabel("Властивості")
-        self.prop_title.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 10px;")
+        self.prop_title = QLabel("Properties")
+        self.prop_title.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.properties_layout.addWidget(self.prop_title)
         
-        self.prop_type_label = QLabel("Тип об'єкта:")
+        self.prop_type_label = QLabel("Object Type:")
         self.prop_type_combo = QComboBox()
-        self.prop_type_combo.addItems(["Статичні блоки", "Анімований персонаж"])
-        
-        self.prop_collision_cb = QCheckBox("Має колізію (твердий)")
-        self.prop_walk_cb = QCheckBox("Може ходити")
-        
+        self.prop_type_combo.addItems(["Static Blocks", "Kill Zone", "Spawner"])
         self.properties_layout.addWidget(self.prop_type_label)
         self.properties_layout.addWidget(self.prop_type_combo)
-        self.properties_layout.addWidget(self.prop_collision_cb)
-        self.properties_layout.addWidget(self.prop_walk_cb)
-        self.properties_layout.addStretch() 
         
-        self.properties_panel.hide() 
+        self.prop_block_container = QWidget()
+        self.prop_block_layout = QVBoxLayout(self.prop_block_container)
+        self.prop_block_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.prop_type_combo.currentIndexChanged.connect(self.save_folder_properties)
-        self.prop_collision_cb.toggled.connect(self.save_folder_properties)
-        self.prop_walk_cb.toggled.connect(self.save_folder_properties)
+        self.prop_visible_cb = QCheckBox("Visible in Game") 
+        self.prop_collision_cb = QCheckBox("Has Collision (Solid)")
+        self.prop_block_layout.addWidget(self.prop_visible_cb)
+        self.prop_block_layout.addWidget(self.prop_collision_cb)
+        self.properties_layout.addWidget(self.prop_block_container)
         
+        self.prop_spawner_container = QWidget()
+        self.prop_spawner_layout = QVBoxLayout(self.prop_spawner_container)
+        self.prop_spawner_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.prop_preset_label = QLabel("Entity Preset:")
+        self.prop_preset_combo = QComboBox()
+        self.prop_preset_combo.addItems(["Player", "Enemy", "Friendly NPC"])
+        self.prop_spawner_layout.addWidget(self.prop_preset_label)
+        self.prop_spawner_layout.addWidget(self.prop_preset_combo)
+        
+        self.prop_walk_cb = QCheckBox("Can Walk")
+        self.prop_jump_cb = QCheckBox("Can Jump")
+        self.prop_wall_jump_cb = QCheckBox("Can Wall Jump")
+        self.prop_dash_cb = QCheckBox("Dash Attack")
+        self.prop_shoot_cb = QCheckBox("Ranged Attack")
+        self.prop_spawner_layout.addWidget(self.prop_walk_cb)
+        self.prop_spawner_layout.addWidget(self.prop_jump_cb)
+        self.prop_spawner_layout.addWidget(self.prop_wall_jump_cb)
+        self.prop_spawner_layout.addWidget(self.prop_dash_cb)
+        self.prop_spawner_layout.addWidget(self.prop_shoot_cb)
+        
+        self.prop_speed_label = QLabel("Walk Speed:")
+        self.prop_speed_input = QDoubleSpinBox()
+        self.prop_speed_input.setRange(0.1, 10.0)
+        self.prop_speed_input.setSingleStep(0.1)
+        self.prop_spawner_layout.addWidget(self.prop_speed_label)
+        self.prop_spawner_layout.addWidget(self.prop_speed_input)
+        
+        self.prop_jump_label = QLabel("Jump Height:")
+        self.prop_jump_input = QSpinBox()
+        self.prop_jump_input.setRange(1, 15)
+        self.prop_spawner_layout.addWidget(self.prop_jump_label)
+        self.prop_spawner_layout.addWidget(self.prop_jump_input)
+
+        self.prop_shoot_cd_label = QLabel("Shoot Cooldown (frames):")
+        self.prop_shoot_cd_input = QSpinBox()
+        self.prop_shoot_cd_input.setRange(10, 300)
+        self.prop_spawner_layout.addWidget(self.prop_shoot_cd_label)
+        self.prop_spawner_layout.addWidget(self.prop_shoot_cd_input)
+        
+        self.properties_layout.addWidget(self.prop_spawner_container)
+        
+        # ДОДАЛИ КНОПКУ РЕСЕТУ
+        self.btn_reset_props = QPushButton("Reset Properties")
+        self.btn_reset_props.setStyleSheet("background-color: #d73a49; color: white; font-weight: bold; padding: 5px; margin-top: 15px;")
+        self.properties_layout.addWidget(self.btn_reset_props)
+
+        self.properties_layout.addStretch()
+        self.properties_panel.hide()
+
         self.current_selected_folder = None 
 
-        # --- ФІНАЛЬНА ЗБІРКА СПЛІТТЕРА (Порядок має значення!) ---
-        self.horizontal_splitter.addWidget(self.sidebar)          # 1. Зліва
-        self.horizontal_splitter.addWidget(self.center_container) # 2. Центр
-        self.horizontal_splitter.addWidget(self.properties_panel) # 3. Справа
+        # Сигнали
+        self.prop_type_combo.currentIndexChanged.connect(self.toggle_properties_ui)
+        self.prop_preset_combo.currentIndexChanged.connect(self.toggle_spawner_features)
+        self.prop_walk_cb.toggled.connect(self.toggle_spawner_features)
+        self.prop_jump_cb.toggled.connect(self.toggle_spawner_features)
+        self.prop_shoot_cb.toggled.connect(self.toggle_spawner_features)
+        self.btn_reset_props.clicked.connect(self.reset_folder_properties) # ПІДКЛЮЧИЛИ КНОПКУ
         
-        # Налаштування розтягування (Центр забирає все вільне місце)
-        self.horizontal_splitter.setCollapsible(0, False)
-        self.horizontal_splitter.setCollapsible(1, False)
-        self.horizontal_splitter.setCollapsible(2, False)
-        
-        self.horizontal_splitter.setStretchFactor(0, 0)
-        self.horizontal_splitter.setStretchFactor(1, 1) # Тільки центр = 1
-        self.horizontal_splitter.setStretchFactor(2, 0)
-        
-        self.horizontal_splitter.setSizes([250, 780, 250])
-        
+        for w in [self.prop_type_combo, self.prop_preset_combo, self.prop_collision_cb, self.prop_visible_cb, 
+                  self.prop_walk_cb, self.prop_shoot_cb, self.prop_jump_cb, self.prop_wall_jump_cb, self.prop_dash_cb,
+                  self.prop_speed_input, self.prop_jump_input, self.prop_shoot_cd_input]:
+            if isinstance(w, QComboBox): w.currentIndexChanged.connect(self.save_folder_properties)
+            elif isinstance(w, QCheckBox): w.toggled.connect(self.save_folder_properties)
+            else: w.valueChanged.connect(self.save_folder_properties)
+
+        self.horizontal_splitter.addWidget(self.sidebar)
+        self.horizontal_splitter.addWidget(self.center_container)
+        self.horizontal_splitter.addWidget(self.properties_panel)
+        self.horizontal_splitter.setStretchFactor(1, 1)
         self.main_layout.addWidget(self.horizontal_splitter)
 
     # ================= РЕШТА ФУНКЦІЙ =================
+    def toggle_properties_ui(self):
+        obj_type = self.prop_type_combo.currentText()
+        is_spawner = (obj_type == "Spawner")
+        is_killzone = (obj_type == "Kill Zone")
+        is_block = (obj_type in ["Static Blocks", "Kill Zone"])
+        
+        self.prop_block_container.setVisible(is_block)
+        self.prop_spawner_container.setVisible(is_spawner)
+        
+        # ФІКС: Примусово знімаємо галочку колізії для Спавнерів та Kill Zone
+        if is_killzone or is_spawner:
+            self.prop_collision_cb.setChecked(False)
+            
+        if is_killzone:
+            self.prop_collision_cb.setVisible(False)
+        else:
+            self.prop_collision_cb.setVisible(True)
+            
+        if is_spawner:
+            self.toggle_spawner_features()
+        
+    def toggle_spawner_features(self):
+        preset = self.prop_preset_combo.currentText()
+        is_player = (preset == "Player")
+        is_enemy = (preset == "Enemy")
+        
+        self.prop_walk_cb.setVisible(True)
+        is_walking = self.prop_walk_cb.isChecked()
+        self.prop_speed_label.setVisible(is_walking)
+        self.prop_speed_input.setVisible(is_walking)
+        
+        self.prop_jump_cb.setVisible(is_player)
+        self.prop_wall_jump_cb.setVisible(is_player)
+        self.prop_dash_cb.setVisible(is_player)
+        
+        is_jumping = is_player and self.prop_jump_cb.isChecked()
+        self.prop_jump_label.setVisible(is_jumping)
+        self.prop_jump_input.setVisible(is_jumping)
+        
+        can_shoot_entity = is_player or is_enemy
+        self.prop_shoot_cb.setVisible(can_shoot_entity)
+        is_shooting = can_shoot_entity and self.prop_shoot_cb.isChecked()
+        self.prop_shoot_cd_label.setVisible(is_shooting)
+        self.prop_shoot_cd_input.setVisible(is_shooting)
+
+    def reset_folder_properties(self):
+        """Скидає властивості до стандартного статичного блоку"""
+        if not self.current_selected_folder: return
+        
+        reply = QMessageBox.question(self, 'Reset Properties', 
+                                     f"Reset '{self.current_selected_folder}' to a default solid block?",
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                                     
+        if reply == QMessageBox.Yes:
+            # Блокуємо сигнали, щоб не зберігати кожен клік
+            widgets = [self.prop_type_combo, self.prop_preset_combo, self.prop_collision_cb, self.prop_visible_cb,
+                      self.prop_walk_cb, self.prop_shoot_cb, self.prop_jump_cb, self.prop_wall_jump_cb, self.prop_dash_cb,
+                      self.prop_speed_input, self.prop_jump_input, self.prop_shoot_cd_input]
+            for w in widgets: w.blockSignals(True)
+            
+            # Скидаємо до дефолту
+            self.prop_type_combo.setCurrentText("Static Blocks")
+            self.prop_preset_combo.setCurrentText("Enemy")
+            self.prop_collision_cb.setChecked(True)
+            self.prop_visible_cb.setChecked(True)
+            self.prop_walk_cb.setChecked(False)
+            self.prop_shoot_cb.setChecked(False)
+            self.prop_jump_cb.setChecked(False)
+            self.prop_wall_jump_cb.setChecked(True)
+            self.prop_dash_cb.setChecked(True)
+            self.prop_speed_input.setValue(1.0)
+            self.prop_jump_input.setValue(3)
+            self.prop_shoot_cd_input.setValue(60)
+            
+            self.toggle_properties_ui()
+            
+            for w in widgets: w.blockSignals(False)
+            
+            # Примусово зберігаємо новий чистий стан
+            self.save_folder_properties()
+            print(f"Властивості для {self.current_selected_folder} скинуто до дефолтних!")
 
     def on_folder_clicked(self, index):
         folder_name = self.tree_model.itemFromIndex(index).text()
@@ -180,9 +295,70 @@ class MainWindow(QMainWindow):
                 qimg = QImage(data, surf.get_width(), surf.get_height(), QImage.Format_RGBA8888)
                 item = QListWidgetItem(QIcon(QPixmap.fromImage(qimg)), f"tile_{i}")
                 item.setSizeHint(QSize(80, 90))
-                item.setTextAlignment(Qt.AlignCenter)
                 self.asset_list.addItem(item)
 
+    def load_folder_properties(self, folder_name):
+        self.current_selected_folder = folder_name
+        self.prop_title.setText(f"Properties: {folder_name}")
+        self.properties_panel.show()
+        
+        widgets = [self.prop_type_combo, self.prop_preset_combo, self.prop_collision_cb, self.prop_visible_cb,
+                  self.prop_walk_cb, self.prop_shoot_cb, self.prop_jump_cb, self.prop_wall_jump_cb, self.prop_dash_cb,
+                  self.prop_speed_input, self.prop_jump_input, self.prop_shoot_cd_input]
+        for w in widgets: w.blockSignals(True)
+        
+        path = os.path.join('data', 'images', 'tiles', folder_name, 'properties.json')
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                obj_type = data.get('type', "Static Blocks")
+                self.prop_type_combo.setCurrentText(obj_type)
+                self.prop_preset_combo.setCurrentText(data.get('preset', "Enemy"))
+                
+                default_col = False if obj_type in ["Kill Zone", "Spawner"] else True
+                self.prop_collision_cb.setChecked(data.get('collision', default_col))
+                
+                self.prop_visible_cb.setChecked(data.get('is_visible', True))
+                self.prop_walk_cb.setChecked(data.get('can_walk', False))
+                self.prop_shoot_cb.setChecked(data.get('can_shoot', False))
+                self.prop_jump_cb.setChecked(data.get('can_jump', False))
+                self.prop_wall_jump_cb.setChecked(data.get('can_wall_jump', True))
+                self.prop_dash_cb.setChecked(data.get('can_dash', True))
+                self.prop_speed_input.setValue(data.get('walk_speed', 1.0))
+                self.prop_jump_input.setValue(data.get('jump_height', 3))
+                self.prop_shoot_cd_input.setValue(data.get('shoot_cooldown', 60))
+        else:
+            self.prop_type_combo.setCurrentText("Static Blocks")
+            self.prop_collision_cb.setChecked(True)
+            self.prop_visible_cb.setChecked(True)
+            self.prop_walk_cb.setChecked(False)
+            
+        self.toggle_properties_ui()
+        for w in widgets: w.blockSignals(False)
+    
+    def save_folder_properties(self):
+        if not self.current_selected_folder: return
+        folder_dir = os.path.join('data', 'images', 'tiles', self.current_selected_folder)
+        if not os.path.exists(folder_dir): return
+            
+        path = os.path.join(folder_dir, 'properties.json')
+        data = {
+            'type': self.prop_type_combo.currentText(),
+            'preset': self.prop_preset_combo.currentText(),
+            # ФІКС: Якщо це Kill Zone або Spawner, колізія ЗАВЖДИ False у файлі JSON
+            'collision': False if self.prop_type_combo.currentText() in ["Kill Zone", "Spawner"] else self.prop_collision_cb.isChecked(),
+            'is_visible': self.prop_visible_cb.isChecked(), 
+            'can_walk': self.prop_walk_cb.isChecked(),
+            'can_shoot': self.prop_shoot_cb.isChecked(),
+            'can_jump': self.prop_jump_cb.isChecked(),
+            'can_wall_jump': self.prop_wall_jump_cb.isChecked(),
+            'can_dash': self.prop_dash_cb.isChecked(),
+            'walk_speed': self.prop_speed_input.value(),
+            'jump_height': self.prop_jump_input.value(),
+            'shoot_cooldown': self.prop_shoot_cd_input.value()
+        }
+        with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
+            
     def on_tile_clicked(self, index):
         tile_index = index.row()
         folder_index = self.tree_view.currentIndex()
@@ -213,13 +389,12 @@ class MainWindow(QMainWindow):
             
             self.sidebar.show()
             self.browser_panel.show()
-            if self.current_selected_folder: 
+            if getattr(self, 'current_selected_folder', None): 
                 self.properties_panel.show() 
             self.viewport.set_mode("EDITOR")
     
     def on_new_folder_clicked(self):
-        folder_name, ok = QInputDialog.getText(self, "Нова папка", "Введіть назву (наприклад: water):")
-        
+        folder_name, ok = QInputDialog.getText(self, "New Folder", "Name (e.g. water):")
         if ok and folder_name:
             path = os.path.join('data', 'images', 'tiles', folder_name)
             if not os.path.exists(path):
@@ -229,18 +404,15 @@ class MainWindow(QMainWindow):
                 item = QStandardItem(folder_name)
                 item.setEditable(False)
                 self.tree_model.appendRow(item)
-                print(f"Створено нову папку: {folder_name}")
             else:
-                QMessageBox.warning(self, "Помилка", "Така папка вже існує!")
+                QMessageBox.warning(self, "Error", "Folder already exists!")
 
     def on_add_tiles_clicked(self):
         index = self.tree_view.currentIndex()
-        if not index.isValid():
-            QMessageBox.warning(self, "Увага", "Спочатку виберіть папку в дереві зліва, куди хочете додати тайли!")
-            return
+        if not index.isValid(): return
             
         folder_name = self.tree_model.itemFromIndex(index).text()
-        files, _ = QFileDialog.getOpenFileNames(self, "Виберіть тайли", "", "Images (*.png)")
+        files, _ = QFileDialog.getOpenFileNames(self, "Select Tiles", "", "Images (*.png)")
         
         if files:
             target_dir = os.path.join('data', 'images', 'tiles', folder_name)
@@ -272,15 +444,14 @@ class MainWindow(QMainWindow):
                 
             self.assets[folder_name] = load_images('tiles/' + folder_name)
             self.on_folder_clicked(index)
-            print(f"Додано {len(files)} файлів. Індекси на мапі автоматично відкориговано!")
     
     def show_context_menu(self, position):
         index = self.tree_view.indexAt(position)
         if not index.isValid(): return 
             
         menu = QMenu()
-        rename_action = menu.addAction("Перейменувати")
-        delete_action = menu.addAction("Видалити")
+        rename_action = menu.addAction("Rename")
+        delete_action = menu.addAction("Delete")
         
         action = menu.exec(self.tree_view.viewport().mapToGlobal(position))
         
@@ -291,7 +462,7 @@ class MainWindow(QMainWindow):
 
     def rename_folder(self, index):
         old_name = self.tree_model.itemFromIndex(index).text()
-        new_name, ok = QInputDialog.getText(self, "Перейменувати", "Нова назва:", text=old_name)
+        new_name, ok = QInputDialog.getText(self, "Rename", "New name:", text=old_name)
         
         if ok and new_name and new_name != old_name:
             old_path = os.path.join('data', 'images', 'tiles', old_name)
@@ -302,16 +473,17 @@ class MainWindow(QMainWindow):
                     os.rename(old_path, new_path) 
                     self.assets[new_name] = self.assets.pop(old_name) 
                     self.tree_model.itemFromIndex(index).setText(new_name)
-                    print(f"Папку {old_name} перейменовано на {new_name}")
+                    if getattr(self, 'current_selected_folder', None) == old_name:
+                        self.load_folder_properties(new_name)
                 except Exception as e:
-                    QMessageBox.critical(self, "Помилка", f"Не вдалося перейменувати: {e}")
+                    QMessageBox.critical(self, "Error", f"Could not rename: {e}")
             else:
-                QMessageBox.warning(self, "Помилка", "Папка з такою назвою вже існує!")
+                QMessageBox.warning(self, "Error", "Folder already exists!")
 
     def delete_folder(self, index):
         folder_name = self.tree_model.itemFromIndex(index).text()
-        reply = QMessageBox.question(self, 'Видалення', 
-                                     f"Ви впевнені, що хочете видалити папку '{folder_name}' та всі тайли в ній?\nЦю дію неможливо скасувати!",
+        reply = QMessageBox.question(self, 'Delete', 
+                                     f"Are you sure you want to delete folder '{folder_name}'?",
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                                      
         if reply == QMessageBox.Yes:
@@ -339,16 +511,15 @@ class MainWindow(QMainWindow):
                 self.asset_list.clear()
                 self.btn_add_tiles.hide()
                 self.properties_panel.hide()
-                print(f"Папку {folder_name} видалено, сцену очищено!")
             except Exception as e:
-                QMessageBox.critical(self, "Помилка", f"Не вдалося видалити: {e}")
+                QMessageBox.critical(self, "Error", f"Could not delete: {e}")
     
     def show_tile_context_menu(self, position):
         item = self.asset_list.itemAt(position)
         if not item: return
             
         menu = QMenu()
-        delete_action = menu.addAction("Видалити тайл")
+        delete_action = menu.addAction("Delete tile")
         action = menu.exec(self.asset_list.viewport().mapToGlobal(position))
         
         if action == delete_action:
@@ -359,8 +530,8 @@ class MainWindow(QMainWindow):
         folder_index = self.tree_view.currentIndex()
         folder_name = self.tree_model.itemFromIndex(folder_index).text()
         
-        reply = QMessageBox.question(self, 'Видалення тайла', 
-                                     f"Видалити цей тайл?\nРушій автоматично оновить мапу.",
+        reply = QMessageBox.question(self, 'Delete tile', 
+                                     f"Delete this tile? Map will auto-update.",
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                                      
         if reply == QMessageBox.Yes:
@@ -402,46 +573,8 @@ class MainWindow(QMainWindow):
                             self.viewport.set_current_tile(folder_name, self.viewport.current_tile_variant - 1)
                         
                     self.on_folder_clicked(folder_index)
-                    print(f"Тайл {file_to_delete} успішно видалено, мапу відкориговано!")
             except Exception as e:
-                QMessageBox.critical(self, "Помилка", f"Не вдалося видалити тайл: {e}")
-    
-    def load_folder_properties(self, folder_name):
-        self.current_selected_folder = folder_name
-        self.prop_title.setText(f"Властивості: {folder_name}")
-        self.properties_panel.show()
-        
-        self.prop_type_combo.blockSignals(True)
-        self.prop_collision_cb.blockSignals(True)
-        self.prop_walk_cb.blockSignals(True)
-        
-        path = os.path.join('data', 'images', 'tiles', folder_name, 'properties.json')
-        if os.path.exists(path):
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                self.prop_type_combo.setCurrentText(data.get('type', "Статичні блоки"))
-                self.prop_collision_cb.setChecked(data.get('collision', True))
-                self.prop_walk_cb.setChecked(data.get('can_walk', False))
-        else:
-            self.prop_type_combo.setCurrentText("Статичні блоки")
-            self.prop_collision_cb.setChecked(True)
-            self.prop_walk_cb.setChecked(False)
-            
-        self.prop_type_combo.blockSignals(False)
-        self.prop_collision_cb.blockSignals(False)
-        self.prop_walk_cb.blockSignals(False)
-
-    def save_folder_properties(self):
-        if not self.current_selected_folder: return
-        
-        path = os.path.join('data', 'images', 'tiles', self.current_selected_folder, 'properties.json')
-        data = {
-            'type': self.prop_type_combo.currentText(),
-            'collision': self.prop_collision_cb.isChecked(),
-            'can_walk': self.prop_walk_cb.isChecked()
-        }
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+                QMessageBox.critical(self, "Error", f"Could not delete tile: {e}")
                                             
     def load_stylesheet(self):
         try:

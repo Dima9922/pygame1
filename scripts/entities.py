@@ -76,37 +76,64 @@ class PhysicsEntity:
     def render(self, surf, offset=(0, 0)):
         surf.blit(pygame.transform.flip(self.animation.img(), self.flip, False), (self.pos[0] - offset[0] + self.anim_offset[0], self.pos[1] - offset[1] + self.anim_offset[1]))
         
+
 class Enemy(PhysicsEntity):
-    def __init__(self, game, pos, size):
+    def __init__(self, game, pos, size, can_walk=True, can_shoot=True, speed=1.0, shoot_cooldown_max=60):
         super().__init__(game, 'enemy', pos, size)
         
+        self.can_walk = can_walk
+        self.can_shoot = can_shoot
+        self.speed = speed  
+        self.shoot_cooldown_max = shoot_cooldown_max 
         self.walking = 0
+        self.shoot_cooldown = 0
         
     def update(self, tilemap, movement=(0, 0)):
-        if self.walking:
-            if tilemap.solid_check((self.rect().centerx + (-7 if self.flip else 7), self.pos[1] + 23)):
-                if (self.collisions['right'] or self.collisions['left']):
-                    self.flip = not self.flip
+        if tilemap.check_kill_zones(self.rect()):
+            if self.game.sfx: self.game.sfx['hit'].play()
+            for i in range(30):
+                angle = random.random() * math.pi * 2
+                speed = random.random() * 5
+                self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
+                self.game.particles.append(Particle(self.game, 'particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+            return True
+            
+        if self.shoot_cooldown > 0:
+            self.shoot_cooldown -= 1
+            
+        if self.can_walk:
+            if self.walking:
+                if tilemap.solid_check((self.rect().centerx + (-7 if self.flip else 7), self.pos[1] + 23)):
+                    if (self.collisions['right'] or self.collisions['left']):
+                        self.flip = not self.flip
+                    else:
+                        movement = (movement[0] - self.speed if self.flip else self.speed, movement[1])
                 else:
-                    movement = (movement[0] - 0.5 if self.flip else 0.5, movement[1])
-            else:
-                self.flip = not self.flip
-            self.walking = max(0, self.walking - 1)
-            if not self.walking:
-                dis = (self.game.player.pos[0] - self.pos[0], self.game.player.pos[1] - self.pos[1])
-                if (abs(dis[1]) < 16):
+                    self.flip = not self.flip
+                self.walking = max(0, self.walking - 1)
+            elif random.random() < 0.01:
+                self.walking = random.randint(30, 120)
+        
+        if self.can_shoot:
+            dis = (self.game.player.pos[0] - self.pos[0], self.game.player.pos[1] - self.pos[1])
+            if (abs(dis[1]) < 16) and (abs(dis[0]) < 250):
+                if self.shoot_cooldown == 0: 
+                    # ФІКС: Додано помітку 'enemy' до кулі
                     if (self.flip and dis[0] < 0):
-                        self.game.sfx['shoot'].play()
-                        self.game.projectiles.append([[self.rect().centerx - 7, self.rect().centery], -1.5, 0])
+                        if self.game.sfx: self.game.sfx['shoot'].play()
+                        self.game.projectiles.append([[self.rect().centerx - 7, self.rect().centery], -1.5, 0, 'enemy'])
                         for i in range(4):
                             self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5 + math.pi, 2 + random.random()))
-                    if (not self.flip and dis[0] > 0):
-                        self.game.sfx['shoot'].play()
-                        self.game.projectiles.append([[self.rect().centerx + 7, self.rect().centery], 1.5, 0])
+                        self.shoot_cooldown = self.shoot_cooldown_max 
+                        self.walking = 0 
+                        
+                    elif (not self.flip and dis[0] > 0):
+                        if self.game.sfx: self.game.sfx['shoot'].play()
+                        self.game.projectiles.append([[self.rect().centerx + 7, self.rect().centery], 1.5, 0, 'enemy'])
                         for i in range(4):
                             self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5, 2 + random.random()))
-        elif random.random() < 0.01:
-            self.walking = random.randint(30, 120)
+                        self.shoot_cooldown = self.shoot_cooldown_max 
+                        self.walking = 0 
         
         super().update(tilemap, movement=movement)
         
@@ -118,7 +145,7 @@ class Enemy(PhysicsEntity):
         if abs(self.game.player.dashing) >= 50:
             if self.rect().colliderect(self.game.player.rect()):
                 self.game.screenshake = max(16, self.game.screenshake)
-                self.game.sfx['hit'].play()
+                if self.game.sfx: self.game.sfx['hit'].play()
                 for i in range(30):
                     angle = random.random() * math.pi * 2
                     speed = random.random() * 5
@@ -143,16 +170,38 @@ class Player(PhysicsEntity):
         self.jumps = 1
         self.wall_slide = False
         self.dashing = 0
+        
+        self.speed = 1.0
+        self.jump_height = 3.0
+        
+        # НОВІ ПАРАМЕТРИ
+        self.can_jump = True 
+        self.can_wall_jump = True 
+        self.can_shoot = False
+        self.can_dash = True
+        self.shoot_cooldown = 0
+        self.shoot_cooldown_max = 60
     
     def update(self, tilemap, movement=(0, 0)):
+        if self.shoot_cooldown > 0:
+            self.shoot_cooldown -= 1
+            
+        if tilemap.check_kill_zones(self.rect()):
+            if not self.game.dead:
+                self.game.screenshake = max(16, self.game.screenshake)
+                if self.game.sfx: self.game.sfx['hit'].play()
+                for i in range(30):
+                    angle = random.random() * math.pi * 2
+                    speed = random.random() * 5
+                    self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
+                    self.game.particles.append(Particle(self.game, 'particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+            self.game.dead += 1
+            
+        movement = (movement[0] * self.speed, movement[1])
+        
         super().update(tilemap, movement=movement)
         
         self.air_time += 1
-        
-        if self.air_time > 120:
-            if not self.game.dead:
-                self.game.screenshake = max(16, self.game.screenshake)
-            self.game.dead += 1
         
         if self.collisions['down']:
             self.air_time = 0
@@ -197,35 +246,67 @@ class Player(PhysicsEntity):
             self.velocity[0] = max(self.velocity[0] - 0.1, 0)
         else:
             self.velocity[0] = min(self.velocity[0] + 0.1, 0)
+            
+    def shoot(self):
+        # ЛОГІКА СТРІЛЬБИ ГРАВЦЯ
+        if self.can_shoot and self.shoot_cooldown == 0:
+            if self.game.sfx: self.game.sfx['shoot'].play()
+            if self.flip:
+                self.game.projectiles.append([[self.rect().centerx - 7, self.rect().centery], -1.5, 0, 'player'])
+                for i in range(4):
+                    self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5 + math.pi, 2 + random.random()))
+            else:
+                self.game.projectiles.append([[self.rect().centerx + 7, self.rect().centery], 1.5, 0, 'player'])
+                for i in range(4):
+                    self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5, 2 + random.random()))
+            self.shoot_cooldown = self.shoot_cooldown_max 
+            return True
+        return False
     
     def render(self, surf, offset=(0, 0)):
         if abs(self.dashing) <= 50:
             super().render(surf, offset=offset)
             
+            # МАЛЮЄМО ПІСТОЛЕТ ГРАВЦЮ
+            if self.can_shoot:
+                if self.flip:
+                    surf.blit(pygame.transform.flip(self.game.assets['gun'], True, False), (self.rect().centerx - 4 - self.game.assets['gun'].get_width() - offset[0], self.rect().centery - offset[1]))
+                else:
+                    surf.blit(self.game.assets['gun'], (self.rect().centerx + 4 - offset[0], self.rect().centery - offset[1]))
+            
     def jump(self):
-        if self.wall_slide:
+        if not self.can_jump: # ФІКС: Блокування стрибка
+            return False
+            
+        if self.wall_slide and self.can_wall_jump:
+            jump_force_y = -float(self.jump_height) * 0.8 
+            jump_force_x = float(self.jump_height) * 1.1 
+            
             if self.flip and self.last_movement[0] < 0:
-                self.velocity[0] = 3.5
-                self.velocity[1] = -2.5
+                self.velocity[0] = jump_force_x
+                self.velocity[1] = jump_force_y
                 self.air_time = 5
                 self.jumps = max(0, self.jumps - 1)
                 return True
             elif not self.flip and self.last_movement[0] > 0:
-                self.velocity[0] = -3.5
-                self.velocity[1] = -2.5
+                self.velocity[0] = -jump_force_x
+                self.velocity[1] = jump_force_y
                 self.air_time = 5
                 self.jumps = max(0, self.jumps - 1)
                 return True
                 
         elif self.jumps:
-            self.velocity[1] = -3
+            self.velocity[1] = -float(self.jump_height) 
             self.jumps -= 1
             self.air_time = 5
             return True
     
     def dash(self):
+        if not self.can_dash: # ФІКС: Блокування ривка
+            return False
+            
         if not self.dashing:
-            self.game.sfx['dash'].play()
+            if self.game.sfx: self.game.sfx['dash'].play()
             if self.flip:
                 self.dashing = -60
             else:

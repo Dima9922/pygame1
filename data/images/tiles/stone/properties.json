@@ -1,5 +1,12 @@
 {
-    "type": "Статичні блоки",
+    "type": "Static Blocks",
+    "preset": "Enemy",
     "collision": true,
-    "can_walk": false
+    "can_walk": false,
+    "can_shoot": false,
+    "can_jump": false,
+    "can_wall_jump": true,
+    "walk_speed": 1.0,
+    "jump_height": 3,
+    "shoot_cooldown": 60
 }

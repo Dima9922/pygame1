@@ -1,0 +1,12 @@
+{
+    "type": "Static Blocks",
+    "preset": "Player",
+    "collision": false,
+    "can_walk": false,
+    "can_shoot": false,
+    "can_jump": false,
+    "can_wall_jump": false,
+    "walk_speed": 0.1,
+    "jump_height": 1,
+    "shoot_cooldown": 10
+}

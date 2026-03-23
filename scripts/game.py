@@ -2,7 +2,7 @@ import os
 import sys
 import math
 import random
-
+import json
 import pygame
 
 from scripts.utils import load_image, load_images, Animation
@@ -13,17 +13,28 @@ from scripts.particle import Particle
 from scripts.spark import Spark
 
 class Game:
-    # Тепер гра приймає розміри віртуального вікна з maker.py
     def __init__(self, assets, v_width, v_height):
-        self.assets = assets # Можемо використовувати спільні тайли
-        
-        # Створюємо внутрішні екрани гри під розмір нашого В'юпорта
+        self.assets = assets.copy() 
+        self.tile_properties = {}
+        for folder in os.listdir('data/images/tiles'):
+            prop_path = f'data/images/tiles/{folder}/properties.json'
+            if os.path.exists(prop_path):
+                with open(prop_path, 'r', encoding='utf-8') as f:
+                    self.tile_properties[folder] = json.load(f)
+            else:
+                if folder in ['spawners', 'player']:
+                    self.tile_properties[folder] = {"type": "Spawner", "preset": "Player"}
+                elif 'decor' in folder or folder == 'clouds':
+                    self.tile_properties[folder] = {"type": "Static Blocks", "collision": False, "is_visible": True}
+                elif 'enemy' in folder:
+                    self.tile_properties[folder] = {"type": "Spawner", "preset": "Enemy", "can_walk": True, "can_shoot": True, "walk_speed": 1.0, "shoot_cooldown": 60}
+                else:
+                    self.tile_properties[folder] = {"type": "Static Blocks", "collision": True, "is_visible": True}
+                
         self.display = pygame.Surface((v_width, v_height), pygame.SRCALPHA)
         self.display_2 = pygame.Surface((v_width, v_height))
-        
         self.movement = [False, False]
         
-        # ДОВАНТАЖУЄМО СПЕЦИФІЧНІ АСЕТИ ГРИ
         self.assets.update({
             'player': load_image('entities/player.png'),
             'background': load_image('background.png'),
@@ -57,12 +68,10 @@ class Game:
             self.sfx['dash'].set_volume(0.3)
             self.sfx['jump'].set_volume(0.7)
             self.sfx['ambience'].play(-1)
-            
             pygame.mixer.music.load('data/sounds/oofoof.mp3')
             pygame.mixer.music.set_volume(0.5)
             pygame.mixer.music.play(-1)
         except:
-            print("Звуки не знайдено, граємо без звуку!")
             self.sfx = None
         
         self.clouds = Clouds(self.assets['clouds'], count = 16)
@@ -70,8 +79,6 @@ class Game:
         self.tilemap = Tilemap(self, tile_size = 16)
         
         self.screenshake = 0
-        
-        # ЗАВЖДИ ВАНТАЖИМО НАШУ ПОТОЧНУ КАРТУ З РЕДАКТОРА
         self.load_level('map.json')
         
     def load_level(self, map_path):
@@ -81,22 +88,43 @@ class Game:
             pass
             
         self.leaf_spawners = []
-        # Знаходимо дерева для генерації листя
         for tree in self.tilemap.extract([('large_decor', 2)], keep = True):
             self.leaf_spawners.append(pygame.Rect(4 + tree['pos'][0], 4 + tree['pos'][1], 23, 13))
             
         self.enemies = []
-        for spawner in self.tilemap.extract([('spawners', 0), ('spawners', 1)]):
-            if spawner['variant'] == 0:
-                self.player.pos = spawner['pos']
+        for spawner in self.tilemap.extract_spawners():
+            folder = spawner['type'] 
+            props = self.tile_properties.get(folder, {})
+            preset = props.get('preset', 'Enemy') 
+
+            if preset == "Player":
+                self.player.pos = list(spawner['pos'])
+                self.player.velocity = [0, 0] 
+                self.player.dashing = 0
                 self.player.air_time = 0
-            else:
-                self.enemies.append(Enemy(self, spawner['pos'], (8, 15)))
+                self.dead = 0
+                
+                # ПЕРЕДАЄМО НОВІ ГАЛОЧКИ ГРАВЦЮ
+                self.player.speed = props.get('walk_speed', 1.0)
+                self.player.jump_height = props.get('jump_height', 3)
+                self.player.can_jump = props.get('can_jump', True) 
+                self.player.can_wall_jump = props.get('can_wall_jump', True) 
+                self.player.can_shoot = props.get('can_shoot', False)
+                self.player.can_dash = props.get('can_dash', True)
+                self.player.shoot_cooldown_max = props.get('shoot_cooldown', 60)
+                
+            elif preset == "Enemy":
+                self.enemies.append(Enemy(
+                    self, spawner['pos'], (8, 15),
+                    can_walk=props.get('can_walk', False),
+                    can_shoot=props.get('can_shoot', False),
+                    speed=props.get('walk_speed', 1.0),
+                    shoot_cooldown_max=props.get('shoot_cooldown', 60) 
+                ))
             
         self.projectiles = []
         self.particles = []
         self.sparks = []
-        
         self.scroll = [0, 0]
         self.dead = 0
         self.transition = -30
@@ -107,7 +135,7 @@ class Game:
         if not len(self.enemies):
             self.transition += 1
             if self.transition > 30:
-                self.load_level('map.json') # Просто перезапускаємо карту для тесту
+                self.load_level('map.json') 
         if self.transition < 0:
             self.transition += 1
         
@@ -145,17 +173,40 @@ class Game:
                     self.sparks.append(Spark(projectile[0], random.random() - 0.5 + (math.pi if projectile[1] > 0 else 0), 2 + random.random()))
             elif projectile[2] > 360:
                 self.projectiles.remove(projectile)
-            elif abs(self.player.dashing) < 50:
-                if self.player.rect().collidepoint(projectile[0]):
-                    self.projectiles.remove(projectile)
-                    self.dead += 1
-                    if self.sfx: self.sfx['hit'].play()
-                    self.screenshake = max(16, self.screenshake)
-                    for i in range(30):
-                        angle = random.random() * math.pi * 2
-                        speed = random.random() * 5
-                        self.sparks.append(Spark(self.player.rect().center, angle, 2 + random.random()))
-                        self.particles.append(Particle(self, 'particle', self.player.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = random.randint(0, 7)))
+            else:
+                # МАГІЯ: Перевіряємо, чия це куля
+                proj_type = projectile[3] if len(projectile) > 3 else 'enemy'
+                
+                if proj_type == 'enemy':
+                    # Ворожа куля вбиває гравця
+                    if abs(self.player.dashing) < 50:
+                        if self.player.rect().collidepoint(projectile[0]):
+                            self.projectiles.remove(projectile)
+                            self.dead += 1
+                            if self.sfx: self.sfx['hit'].play()
+                            self.screenshake = max(16, self.screenshake)
+                            for i in range(30):
+                                angle = random.random() * math.pi * 2
+                                speed = random.random() * 5
+                                self.sparks.append(Spark(self.player.rect().center, angle, 2 + random.random()))
+                                self.particles.append(Particle(self, 'particle', self.player.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = random.randint(0, 7)))
+                
+                elif proj_type == 'player':
+                    # Куля гравця вбиває ворогів
+                    for enemy in self.enemies.copy():
+                        if enemy.rect().collidepoint(projectile[0]):
+                            if projectile in self.projectiles:
+                                self.projectiles.remove(projectile)
+                            if enemy in self.enemies:
+                                self.enemies.remove(enemy)
+                            if self.sfx: self.sfx['hit'].play()
+                            self.screenshake = max(16, self.screenshake)
+                            for i in range(30):
+                                angle = random.random() * math.pi * 2
+                                speed = random.random() * 5
+                                self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
+                                self.particles.append(Particle(self, 'particle', enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = random.randint(0, 7)))
+                            break 
                     
         for spark in self.sparks.copy():
             kill = spark.update()
@@ -169,22 +220,25 @@ class Game:
             if kill:
                 self.particles.remove(particle)
 
-        # Обробка управління (Стрілочки + X)
         for event in events:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
+                if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                     self.movement[0] = True
-                if event.key == pygame.K_RIGHT:
+                if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                     self.movement[1] = True
-                if event.key == pygame.K_UP:
+                if event.key == pygame.K_UP or event.key == pygame.K_w:
                     if self.player.jump():
                         if self.sfx: self.sfx['jump'].play()
                 if event.key == pygame.K_x:
                     self.player.dash()
+                # ПОСТРІЛ НА ПРОБІЛ
+                if event.key == pygame.K_SPACE:
+                    self.player.shoot()
+                    
             if event.type == pygame.KEYUP:
-                if event.key == pygame.K_LEFT:
+                if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                     self.movement[0] = False
-                if event.key == pygame.K_RIGHT:
+                if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                     self.movement[1] = False
 
     def draw(self, surface):
@@ -209,7 +263,6 @@ class Game:
         for spark in self.sparks:
             spark.render(self.display, offset = render_scroll)
             
-        # Ефект тіні (силует)
         display_mask = pygame.mask.from_surface(self.display)
         display_sillhouette = display_mask.to_surface(setcolor = (0, 0, 0, 180), unsetcolor = (0, 0, 0, 0))
         for offset in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
@@ -226,6 +279,5 @@ class Game:
             
         self.display_2.blit(self.display, (0, 0))
         
-        # МАЛЮЄМО ФІНАЛЬНУ КАРТИНКУ ЗІ СКРІНШЕЙКОМ НА ГОЛОВНЕ ПОЛОТНО РУШІЯ
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
         surface.blit(self.display_2, screenshake_offset)

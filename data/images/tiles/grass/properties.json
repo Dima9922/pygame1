@@ -1,10 +1,10 @@
 {
     "type": "Static Blocks",
     "preset": "Enemy",
-    "collision": false,
+    "collision": true,
     "is_visible": true,
-    "can_walk": false,
-    "can_shoot": false,
+    "can_walk": true,
+    "can_shoot": true,
     "can_jump": false,
     "can_wall_jump": true,
     "walk_speed": 1.0,

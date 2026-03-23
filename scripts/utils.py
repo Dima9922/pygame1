@@ -7,13 +7,21 @@ valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.webp')
 def load_image(path):
     if not path.lower().endswith(valid_extensions):
         return None
-    img = pygame.image.load(BASE_IMG_PATH + path).convert()
-    img.set_colorkey((0, 0, 0))
-    return img
+    try:
+        img = pygame.image.load(BASE_IMG_PATH + path).convert()
+        img.set_colorkey((0, 0, 0))
+        return img
+    except Exception as e:
+        print(f"Помилка завантаження {path}: {e}")
+        return None
 
 def load_images(path):
     images = []
-    files = [f for f in sorted(os.listdir(BASE_IMG_PATH + path)) if f.lower().endswith(valid_extensions)]
+    full_path = BASE_IMG_PATH + path
+    if not os.path.exists(full_path):
+        return images
+        
+    files = [f for f in sorted(os.listdir(full_path)) if f.lower().endswith(valid_extensions)]
     for img_name in files:
         img = load_image(path + '/' + img_name)
         if img is not None:

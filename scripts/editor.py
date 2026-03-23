@@ -22,7 +22,6 @@ class Editor:
         self.scroll[0] += (self.movement[1] - self.movement[0]) * 2
         self.scroll[1] += (self.movement[3] - self.movement[2]) * 2
         
-        # ФІКС 1: Робимо скрол цілим числом, щоб сітка не плавала відносно курсора
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
         
         tile_pos = (int((mpos_virtual[0] + render_scroll[0]) // self.tilemap.tile_size), 
@@ -33,7 +32,11 @@ class Editor:
                 if event.button == 1 and is_hovering:
                     self.clicking = True
                     if not self.ongrid and current_type:
-                        self.tilemap.offgrid_tiles.append({'type': current_type, 'variant': current_variant, 'pos': (mpos_virtual[0] + render_scroll[0], mpos_virtual[1] + render_scroll[1])})
+                        img = self.assets[current_type][current_variant]
+                        pos_x = mpos_virtual[0] + render_scroll[0] - img.get_width() / 2
+                        pos_y = mpos_virtual[1] + render_scroll[1] - img.get_height() / 2
+                        # ФІКС: Використовуємо квадратні дужки [pos_x, pos_y] замість круглих!
+                        self.tilemap.offgrid_tiles.append({'type': current_type, 'variant': current_variant, 'pos': [pos_x, pos_y]})
                 if event.button == 3 and is_hovering:
                     self.right_clicking = True
                     
@@ -71,8 +74,8 @@ class Editor:
             for tile in self.tilemap.offgrid_tiles.copy():
                 tile_img = self.assets[tile['type']][tile['variant']]
                 tile_r = pygame.Rect(
-                    tile['pos'][0] - render_scroll[0] - tile_img.get_width() / 2, 
-                    tile['pos'][1] - render_scroll[1] - tile_img.get_height() / 2, 
+                    tile['pos'][0] - render_scroll[0], 
+                    tile['pos'][1] - render_scroll[1], 
                     tile_img.get_width(), 
                     tile_img.get_height())
                 if tile_r.collidepoint(mpos_virtual):
@@ -80,11 +83,11 @@ class Editor:
 
     def draw(self, surface, mpos_virtual, current_type, current_variant, is_hovering):
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
-        self.tilemap.render(surface, offset = render_scroll)
+        self.tilemap.render(surface, offset = render_scroll, render_hidden=True)
         
         if current_type and is_hovering and current_type in self.assets and current_variant < len(self.assets[current_type]):
             current_tile_img = self.assets[current_type][current_variant].copy()
-            current_tile_img.set_alpha(150) # Зробив прев'ю трохи виднішим
+            current_tile_img.set_alpha(150)
             
             tile_pos = (int((mpos_virtual[0] + render_scroll[0]) // self.tilemap.tile_size), 
                         int((mpos_virtual[1] + render_scroll[1]) // self.tilemap.tile_size))
@@ -92,5 +95,4 @@ class Editor:
             if self.ongrid:
                 surface.blit(current_tile_img, (tile_pos[0] * self.tilemap.tile_size - render_scroll[0], tile_pos[1] * self.tilemap.tile_size - render_scroll[1]))
             else:
-                # ФІКС 2: Центруємо картинку рівно по мишці для off-grid малювання
                 surface.blit(current_tile_img, (mpos_virtual[0] - current_tile_img.get_width() / 2, mpos_virtual[1] - current_tile_img.get_height() / 2))
