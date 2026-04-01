@@ -22,6 +22,8 @@ class Tilemap:
         self.tile_size = tile_size
         self.tilemap = {}
         self.offgrid_tiles = []
+        self.bg_path = None
+        self.bg_music = None
         
     def extract(self, id_pairs, keep = False):
         matches = []
@@ -53,7 +55,7 @@ class Tilemap:
     
     def save(self, path):
         f = open(path, 'w')
-        json.dump({'tilemap': self.tilemap, 'tile_size': self.tile_size, 'offgrid': self.offgrid_tiles}, f)
+        json.dump({'tilemap': self.tilemap, 'tile_size': self.tile_size, 'offgrid': self.offgrid_tiles, 'bg_path': getattr(self, 'bg_path', None), 'bg_music': getattr(self, 'bg_music', None)}, f)
         f.close()
         
     def load(self, path):
@@ -63,6 +65,8 @@ class Tilemap:
         self.tilemap = map_data['tilemap']
         self.tile_size = map_data['tile_size']
         self.offgrid_tiles = map_data['offgrid']
+        self.bg_path = map_data.get('bg_path', None)
+        self.bg_music = map_data.get('bg_music', None)
         
     def solid_check(self, pos):
         # Безпечне отримання властивостей
@@ -146,6 +150,27 @@ class Tilemap:
         for tile in self.offgrid_tiles:
             props = properties.get(tile['type'], {})
             if props.get('type') == 'Kill Zone':
+                if tile['type'] in self.game.assets and isinstance(self.game.assets[tile['type']], list) and tile['variant'] < len(self.game.assets[tile['type']]):
+                    img = self.game.assets[tile['type']][tile['variant']]
+                    tile_rect = pygame.Rect(tile['pos'][0], tile['pos'][1], img.get_width(), img.get_height())
+                    if rect.colliderect(tile_rect):
+                        return True
+        return False
+    
+    def check_level_exits(self, rect):
+        """Перевіряє дотик гравця до блоку фінішу (Level Exit)"""
+        properties = getattr(self.game, 'tile_properties', {})
+        
+        for tile in self.tiles_around((rect.centerx, rect.centery)):
+            props = properties.get(tile['type'], {})
+            if props.get('type') == 'Level Exit':
+                tile_rect = pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size)
+                if rect.colliderect(tile_rect):
+                    return True
+                    
+        for tile in self.offgrid_tiles:
+            props = properties.get(tile['type'], {})
+            if props.get('type') == 'Level Exit':
                 if tile['type'] in self.game.assets and isinstance(self.game.assets[tile['type']], list) and tile['variant'] < len(self.game.assets[tile['type']]):
                     img = self.game.assets[tile['type']][tile['variant']]
                     tile_rect = pygame.Rect(tile['pos'][0], tile['pos'][1], img.get_width(), img.get_height())

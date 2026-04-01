@@ -5,8 +5,13 @@ BASE_IMG_PATH = 'data/images/'
 valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.webp')
 
 def load_image(path):
-    # Додано перевірку: якщо файлу немає, просто тихо повертаємо None
-    full_path = BASE_IMG_PATH + path
+    # Спочатку перевіряємо, чи шлях вже повний (починається з data/)
+    if path.startswith('data/'):
+        full_path = path
+    else:
+        full_path = BASE_IMG_PATH + path
+        
+    # Якщо файлу немає, просто тихо повертаємо None (без спаму в консоль)
     if not os.path.exists(full_path):
         return None
         
@@ -14,9 +19,8 @@ def load_image(path):
         img = pygame.image.load(full_path).convert()
         img.set_colorkey((0, 0, 0))
         return img
-    except Exception as e:
-        # Пишемо помилку тільки якщо файл є, але він битий
-        print(f"Помилка файлу {path}: {e}")
+    except Exception:
+        # Тихо ігноруємо биті файли
         return None
 
 def load_images(path):
@@ -52,4 +56,10 @@ class Animation:
                 self.done = True
     
     def img(self):
-        return self.images[int(self.frame / self.img_duration)]
+        if not self.images: # Захист: якщо список пустий
+            return None
+            
+        idx = int(self.frame / self.img_duration)
+        idx = min(max(idx, 0), len(self.images) - 1) # Захист: не виходимо за межі
+        
+        return self.images[idx]

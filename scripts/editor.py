@@ -8,7 +8,7 @@ class Editor:
         self.assets = assets
         self.movement = [False, False, False, False]
         
-        # ФІКС: Завантажуємо властивості для Редактора
+        # Завантажуємо властивості плиток для відображення в редакторі
         self.tile_properties = {}
         if os.path.exists('data/images/tiles'):
             for folder in os.listdir('data/images/tiles'):
@@ -19,6 +19,7 @@ class Editor:
                     
         self.tilemap = Tilemap(self, tile_size = 16)
         
+        # Спроба завантажити дефолтну мапу, якщо вона є
         try:
             self.tilemap.load('map.json')
         except FileNotFoundError:
@@ -31,11 +32,13 @@ class Editor:
         self.ongrid = True
         
     def update(self, events, mpos_virtual, current_type, current_variant, is_hovering):
+        # Керування камерою редактора
         self.scroll[0] += (self.movement[1] - self.movement[0]) * 2
         self.scroll[1] += (self.movement[3] - self.movement[2]) * 2
         
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
         
+        # Позиція курсора в координатах сітки
         tile_pos = (int((mpos_virtual[0] + render_scroll[0]) // self.tilemap.tile_size), 
                     int((mpos_virtual[1] + render_scroll[1]) // self.tilemap.tile_size))
         
@@ -43,6 +46,7 @@ class Editor:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1 and is_hovering:
                     self.clicking = True
+                    # Встановлення об'єктів поза сіткою (offgrid)
                     if not self.ongrid and current_type:
                         img = self.assets[current_type][current_variant]
                         pos_x = mpos_virtual[0] + render_scroll[0] - img.get_width() / 2
@@ -74,31 +78,47 @@ class Editor:
                 if event.key == pygame.K_s: self.movement[3] = False
                 if event.key == pygame.K_LSHIFT: self.shift = False
 
+        # Малювання/встановлення блоків на сітку
         if self.clicking and self.ongrid and current_type and is_hovering:
             self.tilemap.tilemap[str(tile_pos[0]) + ';' + str(tile_pos[1])] = {'type': current_type, 'variant': current_variant, 'pos': tile_pos}
             
+        # Логіка видалення блоків (Права кнопка миші)
         if self.right_clicking and is_hovering:
+            # Видалення із сітки
             tile_loc = str(tile_pos[0]) + ';' + str(tile_pos[1])
             if tile_loc in self.tilemap.tilemap:
                 del self.tilemap.tilemap[tile_loc]
                 
+            # Видалення об'єктів поза сіткою (offgrid) із захистом від KeyError
             for tile in self.tilemap.offgrid_tiles.copy():
-                tile_img = self.assets[tile['type']][tile['variant']]
-                tile_r = pygame.Rect(
-                    tile['pos'][0] - render_scroll[0], 
-                    tile['pos'][1] - render_scroll[1], 
-                    tile_img.get_width(), 
-                    tile_img.get_height())
+                # ПЕРЕВІРКА: чи існує тип ассету в пам'яті?
+                if tile['type'] in self.assets and tile['variant'] < len(self.assets[tile['type']]):
+                    tile_img = self.assets[tile['type']][tile['variant']]
+                    tile_r = pygame.Rect(
+                        tile['pos'][0] - render_scroll[0], 
+                        tile['pos'][1] - render_scroll[1], 
+                        tile_img.get_width(), 
+                        tile_img.get_height())
+                else:
+                    # Якщо ассет видалено (наприклад, папка 'spawners'), створюємо зону 16x16, щоб видалити фантомний блок
+                    tile_r = pygame.Rect(
+                        tile['pos'][0] - render_scroll[0], 
+                        tile['pos'][1] - render_scroll[1], 
+                        self.tilemap.tile_size, 
+                        self.tilemap.tile_size)
+                
                 if tile_r.collidepoint(mpos_virtual):
                     self.tilemap.offgrid_tiles.remove(tile)
 
     def draw(self, surface, mpos_virtual, current_type, current_variant, is_hovering):
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
+        # Відображаємо приховані об'єкти (спавнери) у режимі редактора
         self.tilemap.render(surface, offset = render_scroll, render_hidden=True)
         
+        # Відображення «фантомного» блоку під курсором
         if current_type and is_hovering and current_type in self.assets and current_variant < len(self.assets[current_type]):
             current_tile_img = self.assets[current_type][current_variant].copy()
-            current_tile_img.set_alpha(150)
+            current_tile_img.set_alpha(150) # Напівпрозорість
             
             tile_pos = (int((mpos_virtual[0] + render_scroll[0]) // self.tilemap.tile_size), 
                         int((mpos_virtual[1] + render_scroll[1]) // self.tilemap.tile_size))

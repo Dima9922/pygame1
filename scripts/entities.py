@@ -86,9 +86,11 @@ class PhysicsEntity:
         
 
 class Enemy(PhysicsEntity):
-    def __init__(self, game, pos, size, anim_paths=None, can_walk=True, can_shoot=True, speed=1.0, shoot_cooldown_max=60, vision_range=250):
+    # ФІКС: Додано параметр spawner_type, який передається з game.py
+    def __init__(self, game, pos, size, anim_paths=None, spawner_type='enemy', can_walk=True, can_shoot=True, speed=1.0, shoot_cooldown_max=60, vision_range=250):
         super().__init__(game, 'enemy', pos, size, anim_paths)
         
+        self.spawner_type = spawner_type # Зберігаємо тип спавнера для пошуку гучності
         self.vision_range = vision_range
         self.can_walk = can_walk
         self.can_shoot = can_shoot
@@ -99,7 +101,7 @@ class Enemy(PhysicsEntity):
         
     def update(self, tilemap, movement=(0, 0)):
         if tilemap.check_kill_zones(self.rect()):
-            if self.game.sfx: self.game.sfx['hit'].play()
+            self.game.play_sound(self.anim_paths.get('sfx_hit', 'hit.wav'), 'hit.wav', self.spawner_type)
             for i in range(30):
                 angle = random.random() * math.pi * 2
                 speed = random.random() * 5
@@ -124,30 +126,32 @@ class Enemy(PhysicsEntity):
                 self.walking = random.randint(30, 120)
         
         if self.can_shoot:
-            # Оголошуємо змінну ОДРАЗУ, щоб захиститися від UnboundLocalError
             proj_img = self.anim_paths.get('projectile_img', 'projectile.png')
-            
             dis = (self.game.player.pos[0] - self.pos[0], self.game.player.pos[1] - self.pos[1])
             
+            player_visible = False
             if (abs(dis[1]) < 16) and (abs(dis[0]) < self.vision_range):
-                if tilemap.check_line_of_sight(self.rect().center, self.game.player.rect().center):
+                if (self.flip and dis[0] < 0) or (not self.flip and dis[0] > 0):
+                    if tilemap.check_line_of_sight(self.rect().center, self.game.player.rect().center):
+                        player_visible = True
+            
+            if player_visible:
+                self.aiming_timer += 1
+                if self.aiming_timer > 30:
                     if self.shoot_cooldown == 0: 
-                        
-                        if (self.flip and dis[0] < 0):
-                            if self.game.sfx: self.game.sfx['shoot'].play()
+                        self.game.play_sound(self.anim_paths.get('sfx_shoot', 'shoot.wav'), 'shoot.wav', self.spawner_type)
+                        if self.flip:
                             self.game.projectiles.append([[self.rect().centerx - 7, self.rect().centery], -1.5, 0, 'enemy', proj_img])
                             for i in range(4):
                                 self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5 + math.pi, 2 + random.random()))
-                            self.shoot_cooldown = self.shoot_cooldown_max 
-                            self.walking = 0 
-                            
-                        elif (not self.flip and dis[0] > 0):
-                            if self.game.sfx: self.game.sfx['shoot'].play()
+                        else:
                             self.game.projectiles.append([[self.rect().centerx + 7, self.rect().centery], 1.5, 0, 'enemy', proj_img])
                             for i in range(4):
                                 self.game.sparks.append(Spark(self.game.projectiles[-1][0], random.random() - 0.5, 2 + random.random()))
-                            self.shoot_cooldown = self.shoot_cooldown_max 
-                            self.walking = 0
+                        self.shoot_cooldown = self.shoot_cooldown_max 
+                        self.walking = 0 
+            else:
+                self.aiming_timer = 0
         
         super().update(tilemap, movement=movement)
         
@@ -159,7 +163,7 @@ class Enemy(PhysicsEntity):
         if abs(self.game.player.dashing) >= 50:
             if self.rect().colliderect(self.game.player.rect()):
                 self.game.screenshake = max(16, self.game.screenshake)
-                if self.game.sfx: self.game.sfx['hit'].play()
+                self.game.play_sound(self.game.player.anim_paths.get('sfx_hit', 'hit.wav'), 'hit.wav', self.game.player.spawner_type if hasattr(self.game.player, 'spawner_type') else None)
                 for i in range(30):
                     angle = random.random() * math.pi * 2
                     speed = random.random() * 5
@@ -207,7 +211,7 @@ class Player(PhysicsEntity):
         if tilemap.check_kill_zones(self.rect()):
             if not self.game.dead:
                 self.game.screenshake = max(16, self.game.screenshake)
-                if self.game.sfx: self.game.sfx['hit'].play()
+                self.game.play_sound(self.anim_paths.get('sfx_hit', 'hit.wav'), 'hit.wav', getattr(self, 'spawner_type', None))
                 for i in range(30):
                     angle = random.random() * math.pi * 2
                     speed = random.random() * 5
@@ -273,7 +277,7 @@ class Player(PhysicsEntity):
         if self.can_shoot and self.shoot_cooldown == 0:
             proj_img = self.anim_paths.get('projectile_img', 'projectile.png')
             
-            if self.game.sfx: self.game.sfx['shoot'].play()
+            self.game.play_sound(self.anim_paths.get('sfx_shoot', 'shoot.wav'), 'shoot.wav', getattr(self, 'spawner_type', None))
             if self.flip:
                 self.game.projectiles.append([[self.rect().centerx - 7, self.rect().centery], -1.5, 0, 'player', proj_img])
                 for i in range(4):
@@ -313,18 +317,21 @@ class Player(PhysicsEntity):
                 self.velocity[1] = jump_force_y
                 self.air_time = 5
                 self.jumps = max(0, self.jumps - 1)
+                self.game.play_sound(self.anim_paths.get('sfx_jump', 'jump.wav'), 'jump.wav', getattr(self, 'spawner_type', None))
                 return True
             elif not self.flip and self.last_movement[0] > 0:
                 self.velocity[0] = -jump_force_x
                 self.velocity[1] = jump_force_y
                 self.air_time = 5
                 self.jumps = max(0, self.jumps - 1)
+                self.game.play_sound(self.anim_paths.get('sfx_jump', 'jump.wav'), 'jump.wav', getattr(self, 'spawner_type', None))
                 return True
                 
         elif self.jumps:
             self.velocity[1] = -float(self.jump_height) 
             self.jumps -= 1
             self.air_time = 5
+            self.game.play_sound(self.anim_paths.get('sfx_jump', 'jump.wav'), 'jump.wav', getattr(self, 'spawner_type', None))
             return True
     
     def dash(self):
@@ -332,7 +339,7 @@ class Player(PhysicsEntity):
             return False
             
         if not self.dashing:
-            if self.game.sfx: self.game.sfx['dash'].play()
+            self.game.play_sound(self.anim_paths.get('sfx_dash', 'dash.wav'), 'dash.wav', getattr(self, 'spawner_type', None))
             if self.flip:
                 self.dashing = -60
             else:
