@@ -1,0 +1,28 @@
+{
+    "is_menu": true,
+    "ui_elements": [
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                235.67630057803467,
+                59.38728323699422
+            ],
+            "text": "\u0432\u0438\u0445\u0456\u0434",
+            "action": "quit_game",
+            "target": "1.json"
+        },
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                236.60115606936415,
+                249.90751445086704
+            ],
+            "text": "Button 2",
+            "action": "load_map",
+            "target": "2.json"
+        }
+    ],
+    "bg_path": "bg/0"
+}

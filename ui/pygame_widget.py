@@ -4,6 +4,7 @@ from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QImage, QPainter
 from scripts.editor import Editor
 from scripts.game import Game
+from scripts.menu_editor import MenuEditor
 
 class NumiViewport(QWidget):
     def __init__(self, assets, parent=None):
@@ -19,7 +20,9 @@ class NumiViewport(QWidget):
         self.current_tile_variant = 0
         
         self.editor = Editor(self.assets) 
+        self.menu_editor = MenuEditor(self.assets)
         self.game = None
+        self.pause_menu = None 
         self.mode = "EDITOR"
         
         self.mpos = (0, 0)
@@ -30,18 +33,15 @@ class NumiViewport(QWidget):
         self.timer.timeout.connect(self.update_engine)
         self.timer.start(16)
         
-        # ФІКС: Повернули всі клавіші управління редактором!
         self.key_mapping = {
             Qt.Key_Up: pygame.K_UP, Qt.Key_Down: pygame.K_DOWN, 
             Qt.Key_Left: pygame.K_LEFT, Qt.Key_Right: pygame.K_RIGHT,
             Qt.Key_Space: pygame.K_SPACE, Qt.Key_Escape: pygame.K_ESCAPE, 
             Qt.Key_Delete: pygame.K_DELETE, Qt.Key_Shift: pygame.K_LSHIFT, 
             Qt.Key_Control: pygame.K_LCTRL,
-            # Англійська розкладка
             Qt.Key_W: pygame.K_w, Qt.Key_A: pygame.K_a,
             Qt.Key_S: pygame.K_s, Qt.Key_D: pygame.K_d, Qt.Key_X: pygame.K_x,
             Qt.Key_G: pygame.K_g, Qt.Key_T: pygame.K_t, Qt.Key_O: pygame.K_o,
-            # Українська розкладка (ЦФІВ + Ч, П, Е, Щ)
             1062: pygame.K_w, 1060: pygame.K_a, 
             1030: pygame.K_s, 1042: pygame.K_d, 
             1063: pygame.K_x,                   
@@ -53,14 +53,26 @@ class NumiViewport(QWidget):
         self.current_tile_variant = variant
         
     def set_mode(self, new_mode):
-        self.mode = new_mode
-        if self.mode == "PLAY":
-            current_w = max(1, self.width() // self.zoom)
-            current_h = max(1, self.height() // self.zoom)
-            self.display = pygame.Surface((current_w, current_h))
-            self.game = Game(self.assets, current_w, current_h)
-        else:
+        if new_mode == "PLAY":
+            if self.mode != "PAUSE":
+                current_w = max(1, self.width() // self.zoom)
+                current_h = max(1, self.height() // self.zoom)
+                self.display = pygame.Surface((current_w, current_h))
+                self.game = Game(self.assets, current_w, current_h)
+                
+        elif new_mode == "PAUSE":
+            from scripts.menu import Menu
+            buttons = [
+                {"text": "Resume", "action": "resume"},
+                {"text": "Exit to Editor", "action": "exit_to_editor"}
+            ]
+            self.pause_menu = Menu(self, self.set_mode, "PAUSED", buttons, is_overlay=True)
+            
+        elif new_mode in ["EDITOR", "MENU_EDITOR"]:
             self.game = None
+            self.pause_menu = None
+            
+        self.mode = new_mode
             
     def mouseMoveEvent(self, event):
         self.mpos = (event.position().x(), event.position().y())
@@ -104,20 +116,53 @@ class NumiViewport(QWidget):
             self.mock_events.append(pygame.event.Event(pygame.KEYUP, {'key': pg_key}))
             
     def update_engine(self):
-        if self.mode == "EDITOR":
-            current_w, current_h = max(1, self.width() // self.zoom), max(1, self.height() // self.zoom)
-            if self.display.get_width() != current_w or self.display.get_height() != current_h:
-                self.display = pygame.Surface((current_w, current_h))
+        # 1. ЗАВЖДИ обчислюємо розміри і оновлюємо (ФІКС ДЛЯ ПОВНОГО ЕКРАНУ)
+        current_w = max(1, self.width() // self.zoom)
+        current_h = max(1, self.height() // self.zoom)
+        
+        if self.display.get_width() != current_w or self.display.get_height() != current_h:
+            self.display = pygame.Surface((current_w, current_h))
+            if self.mode == "PLAY" and self.game:
+                self.game.resize_display(current_w, current_h)
 
-        self.display.fill((30, 30, 30))
+        if self.mode != "PAUSE":
+            self.display.fill((30, 30, 30))
+            
         mpos_virtual = (self.mpos[0] / self.zoom, self.mpos[1] / self.zoom)
 
         if self.mode == "EDITOR":
             self.editor.update(self.mock_events, mpos_virtual, self.current_tile_group, self.current_tile_variant, self.is_hovering)
             self.editor.draw(self.display, mpos_virtual, self.current_tile_group, self.current_tile_variant, self.is_hovering)
+            
+        elif self.mode == "MENU_EDITOR": 
+            # ФІКС КООРДИНАТ ДЛЯ РЕДАКТОРА
+            self.menu_editor.last_screen_w = self.display.get_width()
+            self.menu_editor.last_screen_h = self.display.get_height()
+            self.menu_editor.update(self.mock_events, mpos_virtual, self.current_tile_group, self.current_tile_variant, self.is_hovering)
+            self.menu_editor.draw(self.display, mpos_virtual, self.current_tile_group, self.current_tile_variant, self.is_hovering)
+            
+            if getattr(self.menu_editor, 'selection_changed', False):
+                self.menu_editor.selection_changed = False
+                main_win = self.window()
+                if hasattr(main_win, 'on_ui_element_selected'):
+                    main_win.on_ui_element_selected()
+            
         elif self.mode == "PLAY" and self.game:
-            self.game.update(self.mock_events)
-            self.game.draw(self.display)
+            pause_triggered = False
+            for event in self.mock_events:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.set_mode("PAUSE")
+                    pause_triggered = True
+                    break
+                    
+            if not pause_triggered:
+                self.game.update(self.mock_events, mpos_virtual)
+                self.game.draw(self.display, mpos_virtual)
+                
+        elif self.mode == "PAUSE" and self.game and self.pause_menu:
+            self.game.draw(self.display) 
+            self.pause_menu.update(self.mock_events, mpos_virtual)
+            self.pause_menu.draw(self.display, mpos_virtual)
             
         self.mock_events.clear()
         self.update() 

@@ -86,11 +86,10 @@ class PhysicsEntity:
         
 
 class Enemy(PhysicsEntity):
-    # ФІКС: Додано параметр spawner_type, який передається з game.py
     def __init__(self, game, pos, size, anim_paths=None, spawner_type='enemy', can_walk=True, can_shoot=True, speed=1.0, shoot_cooldown_max=60, vision_range=250):
         super().__init__(game, 'enemy', pos, size, anim_paths)
         
-        self.spawner_type = spawner_type # Зберігаємо тип спавнера для пошуку гучності
+        self.spawner_type = spawner_type 
         self.vision_range = vision_range
         self.can_walk = can_walk
         self.can_shoot = can_shoot
@@ -106,7 +105,8 @@ class Enemy(PhysicsEntity):
                 angle = random.random() * math.pi * 2
                 speed = random.random() * 5
                 self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
-                self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+                # ФІКС: frame='random'
+                self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame='random'))
             return True
             
         if self.shoot_cooldown > 0:
@@ -168,7 +168,8 @@ class Enemy(PhysicsEntity):
                     angle = random.random() * math.pi * 2
                     speed = random.random() * 5
                     self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
-                    self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+                    # ФІКС: frame='random'
+                    self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame='random'))
                 self.game.sparks.append(Spark(self.rect().center, 0, 5 + random.random()))
                 self.game.sparks.append(Spark(self.rect().center, math.pi, 5 + random.random()))
                 return True
@@ -216,7 +217,8 @@ class Player(PhysicsEntity):
                     angle = random.random() * math.pi * 2
                     speed = random.random() * 5
                     self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
-                    self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+                    # ФІКС: frame='random'
+                    self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame='random'))
             self.game.dead += 1
             
         movement = (movement[0] * self.speed, movement[1])
@@ -256,7 +258,8 @@ class Player(PhysicsEntity):
                 angle = random.random() * math.pi * 2
                 speed = random.random() * 0.5 + 0.5
                 pvelocity = [math.cos(angle) * speed, math.sin(angle) * speed]
-                self.game.particles.append(Particle(self.game, dash_p_type, self.rect().center, velocity=pvelocity, frame=random.randint(0, 7)))
+                # ФІКС: frame='random'
+                self.game.particles.append(Particle(self.game, dash_p_type, self.rect().center, velocity=pvelocity, frame='random'))
         if self.dashing > 0:
             self.dashing = max(0, self.dashing - 1)
         if self.dashing < 0:
@@ -266,7 +269,8 @@ class Player(PhysicsEntity):
             if abs(self.dashing) == 51:
                 self.velocity[0] *= 0.1
             pvelocity = [abs(self.dashing) / self.dashing * random.random() * 3, 0]
-            self.game.particles.append(Particle(self.game, dash_p_type, self.rect().center, velocity=pvelocity, frame=random.randint(0, 7)))
+            # ФІКС: frame='random'
+            self.game.particles.append(Particle(self.game, dash_p_type, self.rect().center, velocity=pvelocity, frame='random'))
                 
         if self.velocity[0] > 0:
             self.velocity[0] = max(self.velocity[0] - 0.1, 0)

@@ -17,7 +17,11 @@ class Game:
         self.assets = assets.copy() 
         self.tile_properties = {}
         
-        # Завантаження властивостей тайлів
+        self.is_menu_mode = False
+        self.ui_elements = []
+        pygame.font.init()
+        self.font = pygame.font.SysFont('arial', 14, bold=True)
+        
         if os.path.exists('data/images/tiles'):
             for folder in os.listdir('data/images/tiles'):
                 prop_path = f'data/images/tiles/{folder}/properties.json'
@@ -25,7 +29,6 @@ class Game:
                     with open(prop_path, 'r', encoding='utf-8') as f:
                         self.tile_properties[folder] = json.load(f)
                 else:
-                    # Дефолтні налаштування, якщо json відсутній
                     if folder in ['spawners', 'player']:
                         self.tile_properties[folder] = {
                             "type": "Spawner", "preset": "Player", "anim_idle": "player/idle", 
@@ -43,13 +46,16 @@ class Game:
         self.display_2 = pygame.Surface((v_width, v_height))
         self.movement = [False, False]
         
-        # Базові ассети
         self.assets.update({
             'clouds': load_images('clouds'),
-            'particle/particle': Animation(load_images('particles/particle'), img_dur = 6, loop = False),
         })
         
-        # Динамічне завантаження сутностей
+        try:
+            part_imgs = load_images('particles/particle')
+            if part_imgs:
+                self.assets['particle/particle'] = Animation(part_imgs, img_dur = 6, loop = False)
+        except: pass
+        
         entities_base_path = 'data/images/entities'
         if os.path.exists(entities_base_path):
             for ent in os.listdir(entities_base_path):
@@ -64,20 +70,17 @@ class Game:
                         elif action.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.webp')):
                             self.assets[f'{ent}/{action}'] = load_image(f'entities/{ent}/{action}')
         
-        # Аудіо система
         self.loaded_sounds = {}
         try:
             self.ambience = pygame.mixer.Sound('data/sfx/ambience.wav')
             self.ambience.set_volume(0.2)
             self.ambience.play(-1)
-        except:
-            pass
+        except: pass
         
         self.clouds = Clouds(self.assets['clouds'], count = 16)
         self.player = Player(self, (50, 50), (8, 15), anim_paths={'idle': 'player/idle'})
         self.tilemap = Tilemap(self, tile_size = 16)
         
-        # Система рівнів
         os.makedirs('data/maps', exist_ok=True)
         self.level_list = sorted([f for f in os.listdir('data/maps') if f.endswith('.json')])
         self.current_level_idx = 0
@@ -94,6 +97,17 @@ class Game:
         if self.level_list:
             self.load_level(f"data/maps/{self.level_list[self.current_level_idx]}")
 
+    def resize_display(self, new_w, new_h):
+        self.display = pygame.Surface((new_w, new_h), pygame.SRCALPHA)
+        self.display_2 = pygame.Surface((new_w, new_h))
+        
+        if not self.is_menu_mode and getattr(self.tilemap, 'bg_path', None):
+            try:
+                folder, variant = self.tilemap.bg_path.split('/')
+                if folder in self.assets and int(variant) < len(self.assets[folder]):
+                    self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], (new_w, new_h))
+            except: pass
+
     def get_image(self, key, fallback_key):
         if key in self.assets and self.assets[key] is not None:
             return self.assets[key]
@@ -109,11 +123,7 @@ class Game:
         return self.assets.get(fallback_key)
 
     def play_sound(self, key, fallback_key=None, entity_type=None):
-        """Програє звук з індивідуальною гучністю з налаштувань об'єкта"""
-        if not key or not pygame.mixer.get_init():
-            return
-            
-        # Отримуємо відсоток гучності з властивостей (дефолт 60%)
+        if not key or not pygame.mixer.get_init(): return
         vol_percent = 60
         if entity_type and entity_type in self.tile_properties:
             vol_percent = self.tile_properties[entity_type].get('sfx_volumes', {}).get(key, 60)
@@ -121,12 +131,9 @@ class Game:
         if key not in self.loaded_sounds:
             path = f"data/sfx/{key}" if not key.startswith("data/") else key
             if os.path.exists(path):
-                try:
-                    self.loaded_sounds[key] = pygame.mixer.Sound(path)
-                except:
-                    self.loaded_sounds[key] = None
-            else:
-                self.loaded_sounds[key] = None
+                try: self.loaded_sounds[key] = pygame.mixer.Sound(path)
+                except: self.loaded_sounds[key] = None
+            else: self.loaded_sounds[key] = None
 
         sound = self.loaded_sounds.get(key)
         if sound:
@@ -139,10 +146,34 @@ class Game:
                 f_sound.play()
 
     def load_level(self, map_path):
+        self.is_menu_mode = False
+        self.ui_elements = []
+        self.enemies = []
+        self.projectiles = []
+        self.particles = []
+        self.sparks = []
+        self.scroll = [0, 0]
+        self.dead = 0
+        self.transition = -30
+        self.bg_image = None
+        
         try:
-            self.tilemap.load(map_path)
-        except FileNotFoundError:
-            pass
+            with open(map_path, 'r', encoding='utf-8') as f:
+                map_data = json.load(f)
+                
+                if map_data.get('is_menu', False):
+                    self.is_menu_mode = True
+                    self.ui_elements = map_data.get('ui_elements', [])
+                    bg_path = map_data.get('bg_path')
+                    if bg_path:
+                        folder, variant = bg_path.split('/')
+                        if folder in self.assets and int(variant) < len(self.assets[folder]):
+                            self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], (640, 360))
+                    pygame.mixer.music.stop() 
+                    return 
+        except FileNotFoundError: pass
+
+        self.tilemap.load(map_path)
             
         pygame.mixer.music.stop()
         level_music = getattr(self.tilemap, 'bg_music', None)
@@ -154,20 +185,14 @@ class Game:
                     pygame.mixer.music.set_volume(0.5)
                     pygame.mixer.music.play(-1)
                 except: pass
-        else:
+            
+        if getattr(self.tilemap, 'bg_path', None):
             try:
-                pygame.mixer.music.load('data/sounds/oofoof.mp3')
-                pygame.mixer.music.set_volume(0.5)
-                pygame.mixer.music.play(-1)
+                folder, variant = self.tilemap.bg_path.split('/')
+                if folder in self.assets and int(variant) < len(self.assets[folder]):
+                    self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], self.display.get_size())
             except: pass
             
-        self.bg_image = None
-        if getattr(self.tilemap, 'bg_path', None):
-            folder, variant = self.tilemap.bg_path.split('/')
-            if folder in self.assets and int(variant) < len(self.assets[folder]):
-                self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], self.display.get_size())
-            
-        self.enemies = []
         for spawner in self.tilemap.extract_spawners():
             folder = spawner['type'] 
             props = self.tile_properties.get(folder, {})
@@ -179,6 +204,7 @@ class Game:
                 'jump': props.get('anim_jump', 'player/jump'),
                 'slide': props.get('anim_dash', 'player/slide'),
                 'wall_slide': props.get('anim_wall_slide', 'player/wall_slide'),
+                'die': props.get('anim_die', 'particle/particle'),
                 'weapon_img': props.get('weapon_img', 'gun.png'),
                 'projectile_img': props.get('projectile_img', 'projectile.png'),
                 'sfx_hit': props.get('sfx_hit', 'hit.wav'),
@@ -215,21 +241,44 @@ class Game:
                     shoot_cooldown_max=props.get('shoot_cooldown', 60),
                     vision_range=props.get('vision_range', 15) * 16 
                 ))
-            
-        self.projectiles = []
-        self.particles = []
-        self.sparks = []
-        self.scroll = [0, 0]
-        self.dead = 0
-        self.transition = -30
 
-    def update(self, events):
+    def update(self, events, mpos_virtual=(0,0)):
+        if self.is_menu_mode:
+            scale = min(self.display.get_width() / 640, self.display.get_height() / 360)
+            offset_x = (self.display.get_width() - int(640 * scale)) // 2
+            offset_y = (self.display.get_height() - int(360 * scale)) // 2
+            
+            if scale > 0:
+                cmx = (mpos_virtual[0] - offset_x) / scale
+                cmy = (mpos_virtual[1] - offset_y) / scale
+            else:
+                cmx, cmy = 0, 0
+            
+            for event in events:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    for el in self.ui_elements:
+                        if el['type'] in self.assets and el['variant'] < len(self.assets[el['type']]):
+                            img = self.assets[el['type']][el['variant']]
+                            rect = pygame.Rect(el['pos'][0], el['pos'][1], img.get_width(), img.get_height())
+                            if rect.collidepoint((cmx, cmy)):
+                                action = el.get('action', 'load_map')
+                                if action == 'load_map':
+                                    target = el.get('target', '1.json')
+                                    with open('data/maps/current_play.txt', 'w') as f: f.write(target)
+                                    self.load_level(f"data/maps/{target}")
+                                elif action == 'quit_game':
+                                    pygame.quit()
+                                    sys.exit()
+                                elif action == 'open_url':
+                                    import webbrowser
+                                    webbrowser.open(el.get('target', 'http://google.com'))
+            return
+
         self.screenshake = max(0, self.screenshake - 1)
-        
         if not self.dead and not getattr(self, 'level_complete', False):
             if hasattr(self.tilemap, 'check_level_exits') and self.tilemap.check_level_exits(self.player.rect()):
                 self.level_complete = True
-                
+        
         if getattr(self, 'level_complete', False):
             self.transition += 1
             if self.transition > 30:
@@ -252,7 +301,6 @@ class Game:
         self.scroll[1] += (self.player.rect().centery - self.display.get_height() / 2 - self.scroll[1]) / 30
         
         self.clouds.update()
-        
         for enemy in self.enemies.copy():
             kill = enemy.update(self.tilemap, (0, 0))
             if kill: self.enemies.remove(enemy)
@@ -278,24 +326,25 @@ class Game:
                             self.dead += 1
                             self.play_sound(self.player.anim_paths.get('sfx_hit', 'hit.wav'), 'hit.wav', self.player.spawner_type)
                             self.screenshake = max(16, self.screenshake)
-                            for i in range(30):
-                                angle = random.random() * math.pi * 2
-                                speed = random.random() * 5
-                                self.sparks.append(Spark(self.player.rect().center, angle, 2 + random.random()))
-                                self.particles.append(Particle(self, 'particle/particle', self.player.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = random.randint(0, 7)))
-                
+                            
                 elif proj_type == 'player':
                     for enemy in self.enemies.copy():
                         if enemy.rect().collidepoint(projectile[0]):
                             if projectile in self.projectiles: self.projectiles.remove(projectile)
                             if enemy in self.enemies: self.enemies.remove(enemy)
-                            self.play_sound(enemy.anim_paths.get('sfx_hit', 'hit.wav'), 'hit.wav', enemy.spawner_type)
+                            self.play_sound(enemy.anim_paths.get('sfx_hit', 'hit.wav'), 'hit.wav', getattr(enemy, 'spawner_type', None))
                             self.screenshake = max(16, self.screenshake)
+                            
+                            death_fx = enemy.anim_paths.get('die', 'particle/particle')
+                            fx_key = death_fx if death_fx in self.assets else None 
+                            
                             for i in range(30):
                                 angle = random.random() * math.pi * 2
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
-                                self.particles.append(Particle(self, 'particle/particle', enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = random.randint(0, 7)))
+                                if fx_key:
+                                    # ТУТ ЗМІНЕНО frame='random'
+                                    self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     
         for spark in self.sparks.copy():
@@ -314,8 +363,52 @@ class Game:
                 if event.key in [pygame.K_LEFT, pygame.K_a]: self.movement[0] = False
                 if event.key in [pygame.K_RIGHT, pygame.K_d]: self.movement[1] = False
 
-    def draw(self, surface):
+    def draw(self, surface, mpos_virtual=(0,0)):
         self.display.fill((0, 0, 0, 0))
+        
+        if self.is_menu_mode:
+            menu_surf = pygame.Surface((640, 360))
+            if getattr(self, 'bg_image', None):
+                menu_surf.blit(self.bg_image, (0, 0))
+            else:
+                menu_surf.fill((25, 25, 35)) 
+            
+            scale = min(self.display.get_width() / 640, self.display.get_height() / 360)
+            offset_x = (self.display.get_width() - int(640 * scale)) // 2
+            offset_y = (self.display.get_height() - int(360 * scale)) // 2
+            
+            if scale > 0:
+                cmx = (mpos_virtual[0] - offset_x) / scale
+                cmy = (mpos_virtual[1] - offset_y) / scale
+            else:
+                cmx, cmy = 0, 0
+            
+            for el in self.ui_elements:
+                if el['type'] in self.assets and el['variant'] < len(self.assets[el['type']]):
+                    img = self.assets[el['type']][el['variant']]
+                    rect = pygame.Rect(el['pos'][0], el['pos'][1], img.get_width(), img.get_height())
+                    
+                    if rect.collidepoint((cmx, cmy)):
+                        pygame.draw.rect(menu_surf, (255, 204, 0), rect.inflate(4, 4), 2, border_radius=4)
+                    
+                    menu_surf.blit(img, (el['pos'][0], el['pos'][1]))
+                    
+                    text = el.get('text', '')
+                    if text:
+                        text_surf = self.font.render(text, True, (255, 255, 255))
+                        shadow_surf = self.font.render(text, True, (0, 0, 0))
+                        text_rect = text_surf.get_rect(center=(el['pos'][0] + img.get_width()/2, el['pos'][1] + img.get_height()/2))
+                        menu_surf.blit(shadow_surf, (text_rect.x + 1, text_rect.y + 1))
+                        menu_surf.blit(text_surf, text_rect)
+            
+            scaled_w, scaled_h = int(640 * scale), int(360 * scale)
+            if scaled_w > 0 and scaled_h > 0:
+                scaled_menu = pygame.transform.scale(menu_surf, (scaled_w, scaled_h))
+                self.display_2.fill((5, 5, 8))
+                self.display_2.blit(scaled_menu, (offset_x, offset_y))
+                surface.blit(self.display_2, (0, 0))
+            return
+
         if getattr(self, 'bg_image', None): self.display_2.blit(self.bg_image, (0, 0))
         else: self.display_2.fill((30, 30, 50)) 
         
@@ -325,26 +418,27 @@ class Game:
         
         for enemy in self.enemies: enemy.render(self.display, offset = render_scroll)
         if not self.dead: self.player.render(self.display, offset = render_scroll)
-            
+        for spark in self.sparks: spark.render(self.display, offset = render_scroll)
+        for particle in self.particles: particle.render(self.display, offset = render_scroll)
+        
         for projectile in self.projectiles:
             img_key = projectile[4] if len(projectile) > 4 else 'projectile.png'
             img = self.get_image(img_key, 'projectile.png')
             if img:
                 self.display.blit(img, (projectile[0][0] - img.get_width() / 2 - render_scroll[0], projectile[0][1] - img.get_height() / 2 - render_scroll[1]))
             
-        for spark in self.sparks: spark.render(self.display, offset = render_scroll)
-        for particle in self.particles: particle.render(self.display, offset = render_scroll)
-            
         display_mask = pygame.mask.from_surface(self.display)
         display_sillhouette = display_mask.to_surface(setcolor = (0, 0, 0, 180), unsetcolor = (0, 0, 0, 0))
-        for offset in [(-1, 0), (1, 0), (0, -1), (0, 1)]: self.display_2.blit(display_sillhouette, offset)
+        for offset in [(-1, 0), (1, 0), (0, -1), (0, 1)]: 
+            self.display_2.blit(display_sillhouette, offset)
             
-        if self.transition:
+        if getattr(self, 'transition', 0):
             transition_surf = pygame.Surface(self.display.get_size())
             pygame.draw.circle(transition_surf, (255, 255, 255), (self.display.get_width() // 2, self.display.get_height() // 2), (30 - abs(self.transition)) * 8)
             transition_surf.set_colorkey((255, 255, 255))
             self.display.blit(transition_surf, (0, 0))
             
         self.display_2.blit(self.display, (0, 0))
+        
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
         surface.blit(self.display_2, screenshake_offset)

@@ -6,6 +6,7 @@
     "anim_jump": "player/jump",
     "anim_dash": "player/dash",
     "anim_wall_slide": "player/wall_slide",
+    "anim_die": "parcticles/dies",
     "weapon_img": "parcticles/guns/gun2.png",
     "projectile_img": "parcticles/bullets/projectile.png",
     "sfx_hit": "hit.wav",
@@ -18,6 +19,9 @@
         "dash.wav": 28,
         "shoot.wav": 60
     },
+    "ui_text": "Button",
+    "ui_action": "load_map",
+    "ui_target": "1.json",
     "collision": false,
     "is_visible": true,
     "can_walk": true,
@@ -27,6 +31,6 @@
     "can_dash": true,
     "walk_speed": 1.4,
     "jump_height": 3,
-    "shoot_cooldown": 40,
+    "shoot_cooldown": 39,
     "vision_range": 15
 }

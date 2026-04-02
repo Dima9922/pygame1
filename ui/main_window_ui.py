@@ -147,7 +147,7 @@ def setup_ui(main_window, assets):
     # 1. Загальні
     main_window.prop_type_label = QLabel("Object Type:")
     main_window.prop_type_combo = QComboBox()
-    main_window.prop_type_combo.addItems(["Static Blocks", "Kill Zone", "Spawner", "Background", "Level Exit"])
+    main_window.prop_type_combo.addItems(["Static Blocks", "Kill Zone", "Spawner", "Background", "Level Exit", "UI Button"])
     main_window.properties_layout.addWidget(main_window.prop_type_label)
     main_window.properties_layout.addWidget(main_window.prop_type_combo)
     
@@ -266,6 +266,27 @@ def setup_ui(main_window, assets):
 
     main_window.properties_layout.addWidget(main_window.prop_spawner_container)
 
+    # 5. UI Button
+    main_window.prop_ui_btn_container = QWidget()
+    main_window.prop_ui_btn_layout = QVBoxLayout(main_window.prop_ui_btn_container)
+    main_window.prop_ui_btn_layout.setContentsMargins(0, 0, 0, 0)
+
+    main_window.prop_ui_text_label = QLabel("Button Text:")
+    main_window.prop_ui_text_input = QLineEdit()
+    main_window.prop_ui_action_label = QLabel("On Click Action:")
+    main_window.prop_ui_action_combo = QComboBox()
+    main_window.prop_ui_action_combo.addItems(["load_map", "quit_game", "open_url"])
+    main_window.prop_ui_target_label = QLabel("Target (Map/URL):")
+    main_window.prop_ui_target_input = QLineEdit()
+
+    main_window.prop_ui_btn_layout.addWidget(main_window.prop_ui_text_label)
+    main_window.prop_ui_btn_layout.addWidget(main_window.prop_ui_text_input)
+    main_window.prop_ui_btn_layout.addWidget(main_window.prop_ui_action_label)
+    main_window.prop_ui_btn_layout.addWidget(main_window.prop_ui_action_combo)
+    main_window.prop_ui_btn_layout.addWidget(main_window.prop_ui_target_label)
+    main_window.prop_ui_btn_layout.addWidget(main_window.prop_ui_target_input)
+    main_window.properties_layout.addWidget(main_window.prop_ui_btn_container)
+    
     # --- ВІДДІЛЕНА СЕКЦІЯ: SFX & VOLUMES ---
     main_window.sfx_divider = QFrame()
     main_window.sfx_divider.setFrameShape(QFrame.HLine)

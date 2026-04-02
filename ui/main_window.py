@@ -3,7 +3,7 @@ import os
 import shutil
 import json
 import pygame
-from PySide6.QtWidgets import (QMainWindow, QInputDialog, QFileDialog, QMessageBox, QApplication, QMenu, QComboBox, QCheckBox, QListWidgetItem)
+from PySide6.QtWidgets import (QMainWindow, QInputDialog, QFileDialog, QMessageBox, QApplication, QMenu, QComboBox, QCheckBox, QListWidgetItem, QPushButton, QHBoxLayout, QLabel, QSlider, QLineEdit)
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon, QPixmap, QImage
 from scripts.utils import load_images
@@ -20,6 +20,18 @@ class MainWindow(QMainWindow):
         self.current_selected_folder = None 
         
         setup_ui(self, assets)
+        
+        # НОВЕ: Динамічно додаємо поле для анімації смерті в контейнер спавнера
+        self.prop_anim_die_label = QLabel("Death Effect (Anim):")
+        self.prop_anim_die_input = QLineEdit("particle/particle")
+        self.prop_spawner_container.layout().addWidget(self.prop_anim_die_label)
+        self.prop_spawner_container.layout().addWidget(self.prop_anim_die_input)
+        
+        self.btn_toggle_editor = QPushButton("🎨 Menu Editor")
+        self.btn_toggle_editor.setCheckable(True)
+        self.btn_toggle_editor.setToolTip("Switch between Level Editor and UI Editor")
+        self.toolbar_layout.insertWidget(4, self.btn_toggle_editor)
+        self.btn_toggle_editor.toggled.connect(self.on_editor_mode_toggled)
         
         os.makedirs('data/maps', exist_ok=True)
         if os.path.exists('map.json') and not os.path.exists('data/maps/0.json'):
@@ -57,14 +69,10 @@ class MainWindow(QMainWindow):
                   self.prop_anim_wall_slide_input, self.prop_anim_dash_input,
                   self.prop_weapon_img_input, self.prop_projectile_img_input,
                   self.prop_sfx_hit_input, self.prop_sfx_jump_input, 
-                  self.prop_sfx_dash_input, self.prop_sfx_shoot_input]
+                  self.prop_sfx_dash_input, self.prop_sfx_shoot_input,
+                  self.prop_anim_die_input] # ДОДАНО СЮДИ
         for input_field in inputs:
             input_field.textChanged.connect(self.save_folder_properties)
-            
-        sliders = [self.prop_sfx_hit_slider, self.prop_sfx_jump_slider, 
-                   self.prop_sfx_dash_slider, self.prop_sfx_shoot_slider]
-        for slider in sliders:
-            slider.valueChanged.connect(self.save_folder_properties)
         
         for w in [self.prop_type_combo, self.prop_preset_combo, self.prop_collision_cb, self.prop_visible_cb, 
                   self.prop_walk_cb, self.prop_shoot_cb, self.prop_jump_cb, self.prop_wall_jump_cb, self.prop_dash_cb,
@@ -72,6 +80,29 @@ class MainWindow(QMainWindow):
             if isinstance(w, QComboBox): w.currentIndexChanged.connect(self.save_folder_properties)
             elif isinstance(w, QCheckBox): w.toggled.connect(self.save_folder_properties)
             else: w.valueChanged.connect(self.save_folder_properties)
+            
+        if hasattr(self, 'prop_ui_text_input'):
+            self.prop_ui_text_input.textChanged.connect(self.save_folder_properties)
+            self.prop_ui_action_combo.currentIndexChanged.connect(self.save_folder_properties)
+            self.prop_ui_target_input.textChanged.connect(self.save_folder_properties)
+            
+    def on_editor_mode_toggled(self, checked):
+        if checked:
+            self.btn_toggle_editor.setText("🌍 Level Editor")
+            self.btn_toggle_editor.setStyleSheet("background-color: #28a745; color: white; font-weight: bold;")
+            self.viewport.set_mode("MENU_EDITOR")
+            self.prop_title.setText("Properties: UI Editor")
+        else:
+            self.btn_toggle_editor.setText("🎨 Menu Editor")
+            self.btn_toggle_editor.setStyleSheet("")
+            self.viewport.set_mode("EDITOR")
+            self.prop_title.setText("Properties")
+            
+        self.update_map_list()
+        
+        current_map = self.map_combo.currentText()
+        if current_map:
+            self.on_map_changed(current_map)
 
     def closeEvent(self, event):
         self.on_save_clicked()
@@ -80,34 +111,79 @@ class MainWindow(QMainWindow):
     def update_map_list(self):
         self.map_combo.blockSignals(True)
         self.map_combo.clear()
-        maps = sorted([f for f in os.listdir('data/maps') if f.endswith('.json')])
-        if not maps:
-            with open('data/maps/0.json', 'w') as f:
-                json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': []}, f)
-            maps = ['0.json']
-        self.map_combo.addItems(maps)
+        
+        is_menu_mode = self.btn_toggle_editor.isChecked()
+        valid_maps = []
+        
+        map_files = sorted([f for f in os.listdir('data/maps') if f.endswith('.json')])
+        
+        for f_name in map_files:
+            path = f'data/maps/{f_name}'
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    is_menu_file = data.get('is_menu', False)
+                    
+                    if is_menu_mode and is_menu_file:
+                        valid_maps.append(f_name)
+                    elif not is_menu_mode and not is_menu_file:
+                        valid_maps.append(f_name)
+            except:
+                pass
+                
+        if not valid_maps:
+            default_name = "main_menu.json" if is_menu_mode else "0.json"
+            path = f'data/maps/{default_name}'
+            with open(path, 'w') as f:
+                if is_menu_mode:
+                    json.dump({'is_menu': True, 'ui_elements': []}, f)
+                else:
+                    json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': []}, f)
+            valid_maps = [default_name]
+            
+        self.map_combo.addItems(valid_maps)
         self.map_combo.blockSignals(False)
 
     def on_map_changed(self, map_name):
         if map_name:
+            path = f'data/maps/{map_name}'
             try:
-                self.viewport.editor.tilemap.load(f'data/maps/{map_name}')
-                bg_path = getattr(self.viewport.editor.tilemap, 'bg_path', None)
-                bg_music = getattr(self.viewport.editor.tilemap, 'bg_music', None)
-                if hasattr(self, 'prop_current_bg_label'):
-                    self.prop_current_bg_label.setText(f"Active BG: {bg_path if bg_path else 'None'}")
-                    self.prop_current_music_label.setText(f"Active Music: {bg_music if bg_music else 'None'}")
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                if data.get('is_menu', False):
+                    self.viewport.set_mode("MENU_EDITOR")
+                    self.viewport.menu_editor.load(path)
+                    
+                    bg_path = getattr(self.viewport.menu_editor, 'bg_path', None)
+                    if hasattr(self, 'prop_current_bg_label'):
+                        self.prop_current_bg_label.setText(f"Active BG: {bg_path if bg_path else 'None'}")
+                        self.prop_current_music_label.setText(f"Active Music: None (UI Mode)")
+                else:
+                    self.viewport.set_mode("EDITOR")
+                    self.viewport.editor.tilemap.load(path)
+                    
+                    bg_path = getattr(self.viewport.editor.tilemap, 'bg_path', None)
+                    bg_music = getattr(self.viewport.editor.tilemap, 'bg_music', None)
+                    if hasattr(self, 'prop_current_bg_label'):
+                        self.prop_current_bg_label.setText(f"Active BG: {bg_path if bg_path else 'None'}")
+                        self.prop_current_music_label.setText(f"Active Music: {bg_music if bg_music else 'None'}")
             except Exception as e:
                 print(f"Error loading map: {e}")
 
     def on_new_map_clicked(self):
-        name, ok = QInputDialog.getText(self, "New Map", "Map name (e.g., '1' or 'level2'):")
+        name, ok = QInputDialog.getText(self, "New Map", "Map name (e.g., '1' or 'main_menu'):")
         if ok and name:
             file_name = f"{name}.json"
             path = os.path.join('data/maps', file_name)
             if not os.path.exists(path):
-                with open(path, 'w') as f:
-                    json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': []}, f)
+                if self.btn_toggle_editor.isChecked():
+                    with open(path, 'w') as f:
+                        json.dump({'is_menu': True, 'ui_elements': []}, f)
+                else:
+                    with open(path, 'w') as f:
+                        json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': []}, f)
+                        
                 self.update_map_list()
                 self.map_combo.setCurrentText(file_name)
             else:
@@ -126,20 +202,25 @@ class MainWindow(QMainWindow):
         is_spawner = (obj_type == "Spawner")
         is_killzone = (obj_type == "Kill Zone")
         is_bg = (obj_type == "Background")
+        is_ui_btn = (obj_type == "UI Button")
         is_block = (obj_type in ["Static Blocks", "Kill Zone", "Level Exit"])
         
         self.prop_block_container.setVisible(is_block)
         self.prop_spawner_container.setVisible(is_spawner)
         self.prop_bg_container.setVisible(is_bg)
         
-        self.sfx_container.setVisible(is_spawner)
-        self.sfx_divider.setVisible(is_spawner)
-        self.sfx_title_label.setVisible(is_spawner)
+        if hasattr(self, 'prop_ui_btn_container'):
+            self.prop_ui_btn_container.setVisible(is_ui_btn)
+            
+        if hasattr(self, 'sfx_container'):
+            self.sfx_container.setVisible(is_spawner)
+            self.sfx_divider.setVisible(is_spawner)
+            self.sfx_title_label.setVisible(is_spawner)
         
-        if is_killzone or is_spawner or is_bg:
+        if is_killzone or is_spawner or is_bg or is_ui_btn:
             self.prop_collision_cb.setChecked(False)
             
-        if is_killzone or is_bg:
+        if is_killzone or is_bg or is_ui_btn:
             self.prop_collision_cb.setVisible(False)
         else:
             self.prop_collision_cb.setVisible(True)
@@ -148,8 +229,11 @@ class MainWindow(QMainWindow):
             self.toggle_spawner_features()
     
     def clear_background(self):
-        self.viewport.editor.tilemap.bg_path = None
-        self.viewport.editor.tilemap.bg_music = None
+        if self.viewport.mode == "MENU_EDITOR":
+            self.viewport.menu_editor.bg_path = None
+        else:
+            self.viewport.editor.tilemap.bg_path = None
+            self.viewport.editor.tilemap.bg_music = None
         self.prop_current_bg_label.setText("Active BG: None")
         self.prop_current_music_label.setText("Active Music: None")
             
@@ -195,11 +279,9 @@ class MainWindow(QMainWindow):
         
         self.prop_vision_label.setVisible(is_enemy)
         self.prop_vision_input.setVisible(is_enemy)
-
-        if hasattr(self, 'row_sfx_hit'): self.row_sfx_hit.setVisible(is_entity)
-        if hasattr(self, 'row_sfx_jump'): self.row_sfx_jump.setVisible(is_jumping)
-        if hasattr(self, 'row_sfx_dash'): self.row_sfx_dash.setVisible(is_dash)
-        if hasattr(self, 'row_sfx_shoot'): self.row_sfx_shoot.setVisible(is_shooting)
+        
+        self.prop_anim_die_label.setVisible(is_entity)
+        self.prop_anim_die_input.setVisible(is_entity)
 
     def reset_folder_properties(self):
         if not self.current_selected_folder: return
@@ -215,8 +297,7 @@ class MainWindow(QMainWindow):
                       self.prop_weapon_img_input, self.prop_projectile_img_input,
                       self.prop_sfx_hit_input, self.prop_sfx_jump_input, 
                       self.prop_sfx_dash_input, self.prop_sfx_shoot_input,
-                      self.prop_sfx_hit_slider, self.prop_sfx_jump_slider,
-                      self.prop_sfx_dash_slider, self.prop_sfx_shoot_slider]
+                      self.prop_anim_die_input]
             for w in widgets: w.blockSignals(True)
             
             self.prop_type_combo.setCurrentText("Static Blocks")
@@ -226,16 +307,13 @@ class MainWindow(QMainWindow):
             self.prop_anim_jump_input.setText("player/jump")
             self.prop_anim_dash_input.setText("player/slide")
             self.prop_anim_wall_slide_input.setText("player/wall_slide")
+            self.prop_anim_die_input.setText("particle/particle")
             self.prop_weapon_img_input.setText("gun.png")
             self.prop_projectile_img_input.setText("projectile.png")
             self.prop_sfx_hit_input.setText("hit.wav")
             self.prop_sfx_jump_input.setText("jump.wav")
             self.prop_sfx_dash_input.setText("dash.wav")
             self.prop_sfx_shoot_input.setText("shoot.wav")
-            self.prop_sfx_hit_slider.setValue(60)
-            self.prop_sfx_jump_slider.setValue(60)
-            self.prop_sfx_dash_slider.setValue(60)
-            self.prop_sfx_shoot_slider.setValue(60)
             self.prop_collision_cb.setChecked(True)
             self.prop_visible_cb.setChecked(True)
             self.prop_walk_cb.setChecked(False)
@@ -257,10 +335,16 @@ class MainWindow(QMainWindow):
         self.prop_title.setText(f"Properties: {folder_name}")
         self.properties_panel.show()
         
-        bg_path = getattr(self.viewport.editor.tilemap, 'bg_path', None)
-        bg_music = getattr(self.viewport.editor.tilemap, 'bg_music', None)
-        self.prop_current_bg_label.setText(f"Active BG: {bg_path if bg_path else 'None'}")
-        self.prop_current_music_label.setText(f"Active Music: {bg_music if bg_music else 'None'}")
+        if self.viewport.mode == "MENU_EDITOR":
+            bg_path = getattr(self.viewport.menu_editor, 'bg_path', None)
+            bg_music = None
+        else:
+            bg_path = getattr(self.viewport.editor.tilemap, 'bg_path', None)
+            bg_music = getattr(self.viewport.editor.tilemap, 'bg_music', None)
+            
+        if hasattr(self, 'prop_current_bg_label'):
+            self.prop_current_bg_label.setText(f"Active BG: {bg_path if bg_path else 'None'}")
+            self.prop_current_music_label.setText(f"Active Music: {bg_music if bg_music else 'None'}")
         
         widgets = [self.prop_type_combo, self.prop_preset_combo, self.prop_collision_cb, self.prop_visible_cb,
                   self.prop_walk_cb, self.prop_shoot_cb, self.prop_jump_cb, self.prop_wall_jump_cb, self.prop_dash_cb,
@@ -271,7 +355,12 @@ class MainWindow(QMainWindow):
                   self.prop_sfx_hit_input, self.prop_sfx_jump_input, 
                   self.prop_sfx_dash_input, self.prop_sfx_shoot_input,
                   self.prop_sfx_hit_slider, self.prop_sfx_jump_slider,
-                  self.prop_sfx_dash_slider, self.prop_sfx_shoot_slider]
+                  self.prop_sfx_dash_slider, self.prop_sfx_shoot_slider,
+                  self.prop_anim_die_input]
+        
+        if hasattr(self, 'prop_ui_text_input'):
+            widgets.extend([self.prop_ui_text_input, self.prop_ui_action_combo, self.prop_ui_target_input])
+            
         for w in widgets: w.blockSignals(True)
         
         path = os.path.join('data', 'images', 'tiles', folder_name, 'properties.json')
@@ -282,11 +371,17 @@ class MainWindow(QMainWindow):
                 self.prop_type_combo.setCurrentText(obj_type)
                 self.prop_preset_combo.setCurrentText(data.get('preset', "Enemy"))
                 
+                if hasattr(self, 'prop_ui_text_input'):
+                    self.prop_ui_text_input.setText(data.get('ui_text', 'Button'))
+                    self.prop_ui_action_combo.setCurrentText(data.get('ui_action', 'load_map'))
+                    self.prop_ui_target_input.setText(data.get('ui_target', '1.json'))
+                
                 self.prop_anim_idle_input.setText(data.get('anim_idle', 'enemy/idle'))
                 self.prop_anim_walk_input.setText(data.get('anim_walk', 'enemy/run'))
                 self.prop_anim_jump_input.setText(data.get('anim_jump', 'player/jump'))
                 self.prop_anim_dash_input.setText(data.get('anim_dash', 'player/slide'))
                 self.prop_anim_wall_slide_input.setText(data.get('anim_wall_slide', 'player/wall_slide'))
+                self.prop_anim_die_input.setText(data.get('anim_die', 'particle/particle'))
                 self.prop_weapon_img_input.setText(data.get('weapon_img', 'gun.png'))
                 self.prop_projectile_img_input.setText(data.get('projectile_img', 'projectile.png'))
                 
@@ -306,7 +401,7 @@ class MainWindow(QMainWindow):
                 self.prop_sfx_dash_slider.setValue(vols.get(sfx_dash, 60))
                 self.prop_sfx_shoot_slider.setValue(vols.get(sfx_shoot, 60))
                 
-                default_col = False if obj_type in ["Kill Zone", "Spawner", "Background", "Level Exit"] else True
+                default_col = False if obj_type in ["Kill Zone", "Spawner", "Background", "Level Exit", "UI Button"] else True
                 self.prop_collision_cb.setChecked(data.get('collision', default_col))
                 
                 self.prop_visible_cb.setChecked(data.get('is_visible', True))
@@ -326,6 +421,7 @@ class MainWindow(QMainWindow):
             self.prop_anim_jump_input.setText("player/jump")
             self.prop_anim_dash_input.setText("player/slide")
             self.prop_anim_wall_slide_input.setText("player/wall_slide")
+            self.prop_anim_die_input.setText("particle/particle")
             self.prop_weapon_img_input.setText("gun.png")
             self.prop_projectile_img_input.setText("projectile.png")
             self.prop_sfx_hit_input.setText("hit.wav")
@@ -345,18 +441,30 @@ class MainWindow(QMainWindow):
         for w in widgets: w.blockSignals(False)
     
     def save_folder_properties(self):
+        if self.viewport.mode == "MENU_EDITOR":
+            sel_idx = getattr(self.viewport.menu_editor, 'selected_index', None)
+            if sel_idx is not None and sel_idx < len(self.viewport.menu_editor.ui_elements):
+                el = self.viewport.menu_editor.ui_elements[sel_idx]
+                if hasattr(self, 'prop_ui_text_input'):
+                    el['text'] = self.prop_ui_text_input.text()
+                    el['action'] = self.prop_ui_action_combo.currentText()
+                    el['target'] = self.prop_ui_target_input.text()
+            return
+        
         if not self.current_selected_folder: return
         folder_dir = os.path.join('data', 'images', 'tiles', self.current_selected_folder)
         if not os.path.exists(folder_dir): return
             
         path = os.path.join(folder_dir, 'properties.json')
         
-        volumes = {
-            self.prop_sfx_hit_input.text(): self.prop_sfx_hit_slider.value(),
-            self.prop_sfx_jump_input.text(): self.prop_sfx_jump_slider.value(),
-            self.prop_sfx_dash_input.text(): self.prop_sfx_dash_slider.value(),
-            self.prop_sfx_shoot_input.text(): self.prop_sfx_shoot_slider.value()
-        }
+        volumes = {}
+        if hasattr(self, 'prop_sfx_hit_input'):
+            volumes = {
+                self.prop_sfx_hit_input.text(): self.prop_sfx_hit_slider.value(),
+                self.prop_sfx_jump_input.text(): self.prop_sfx_jump_slider.value(),
+                self.prop_sfx_dash_input.text(): self.prop_sfx_dash_slider.value(),
+                self.prop_sfx_shoot_input.text(): self.prop_sfx_shoot_slider.value()
+            }
         
         data = {
             'type': self.prop_type_combo.currentText(),
@@ -366,14 +474,20 @@ class MainWindow(QMainWindow):
             'anim_jump': self.prop_anim_jump_input.text(),
             'anim_dash': self.prop_anim_dash_input.text(),
             'anim_wall_slide': self.prop_anim_wall_slide_input.text(),
+            'anim_die': self.prop_anim_die_input.text(), # ДОДАНО СЮДИ
             'weapon_img': self.prop_weapon_img_input.text(),
             'projectile_img': self.prop_projectile_img_input.text(),
-            'sfx_hit': self.prop_sfx_hit_input.text(),
-            'sfx_jump': self.prop_sfx_jump_input.text(),
-            'sfx_dash': self.prop_sfx_dash_input.text(),
-            'sfx_shoot': self.prop_sfx_shoot_input.text(),
+            'sfx_hit': self.prop_sfx_hit_input.text() if hasattr(self, 'prop_sfx_hit_input') else 'hit.wav',
+            'sfx_jump': self.prop_sfx_jump_input.text() if hasattr(self, 'prop_sfx_jump_input') else 'jump.wav',
+            'sfx_dash': self.prop_sfx_dash_input.text() if hasattr(self, 'prop_sfx_dash_input') else 'dash.wav',
+            'sfx_shoot': self.prop_sfx_shoot_input.text() if hasattr(self, 'prop_sfx_shoot_input') else 'shoot.wav',
             'sfx_volumes': volumes,
-            'collision': False if self.prop_type_combo.currentText() in ["Kill Zone", "Spawner", "Background", "Level Exit"] else self.prop_collision_cb.isChecked(),
+            
+            'ui_text': self.prop_ui_text_input.text() if hasattr(self, 'prop_ui_text_input') else 'Button',
+            'ui_action': self.prop_ui_action_combo.currentText() if hasattr(self, 'prop_ui_action_combo') else 'load_map',
+            'ui_target': self.prop_ui_target_input.text() if hasattr(self, 'prop_ui_target_input') else '1.json',
+            
+            'collision': False if self.prop_type_combo.currentText() in ["Kill Zone", "Spawner", "Background", "Level Exit", "UI Button"] else self.prop_collision_cb.isChecked(),
             'is_visible': self.prop_visible_cb.isChecked(), 
             'can_walk': self.prop_walk_cb.isChecked(),
             'can_shoot': self.prop_shoot_cb.isChecked(),
@@ -389,7 +503,37 @@ class MainWindow(QMainWindow):
             with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
         except FileNotFoundError:
             pass
-
+    
+    def on_ui_element_selected(self):
+        sel_idx = getattr(self.viewport.menu_editor, 'selected_index', None)
+        
+        if sel_idx is not None and sel_idx < len(self.viewport.menu_editor.ui_elements):
+            el = self.viewport.menu_editor.ui_elements[sel_idx]
+            
+            self.properties_panel.show()
+            self.prop_title.setText(f"Properties: Selected Button")
+            
+            if hasattr(self, 'prop_ui_text_input'):
+                self.prop_ui_text_input.blockSignals(True)
+                self.prop_ui_action_combo.blockSignals(True)
+                self.prop_ui_target_input.blockSignals(True)
+                
+                self.prop_ui_text_input.setText(el.get('text', 'Button'))
+                self.prop_ui_action_combo.setCurrentText(el.get('action', 'load_map'))
+                self.prop_ui_target_input.setText(el.get('target', '1.json'))
+                
+                self.prop_ui_text_input.blockSignals(False)
+                self.prop_ui_action_combo.blockSignals(False)
+                self.prop_ui_target_input.blockSignals(False)
+            
+            self.prop_type_combo.blockSignals(True)
+            self.prop_type_combo.setCurrentText("UI Button")
+            self.prop_type_combo.blockSignals(False)
+            self.toggle_properties_ui()
+        else:
+            self.properties_panel.hide()
+            self.prop_title.setText("Properties")
+            
     def on_folder_clicked(self, index):
         parts = self.get_path_parts(index)
         self.asset_list.clear()
@@ -446,8 +590,15 @@ class MainWindow(QMainWindow):
         parts = self.get_path_parts(self.tree_view.currentIndex())
         if parts and parts[0] == "Tiles" and len(parts) == 2:
             if self.prop_type_combo.currentText() == "Background":
-                self.viewport.editor.tilemap.bg_path = f"{parts[1]}/{index.row()}"
-                self.prop_current_bg_label.setText(f"Active BG: {parts[1]} (Image {index.row()})")
+                bg_str = f"{parts[1]}/{index.row()}"
+                
+                if self.viewport.mode == "MENU_EDITOR":
+                    self.viewport.menu_editor.bg_path = bg_str
+                else:
+                    self.viewport.editor.tilemap.bg_path = bg_str
+                    
+                if hasattr(self, 'prop_current_bg_label'):
+                    self.prop_current_bg_label.setText(f"Active BG: {parts[1]} (Image {index.row()})")
                 self.viewport.set_current_tile(None, 0)
             else:
                 self.viewport.set_current_tile(parts[1], index.row())
@@ -457,8 +608,13 @@ class MainWindow(QMainWindow):
     def on_save_clicked(self):
         map_name = self.map_combo.currentText()
         if map_name:
-            self.viewport.editor.tilemap.save(f'data/maps/{map_name}')
-            print(f"Мапу успішно збережено в data/maps/{map_name}!")
+            path = f'data/maps/{map_name}'
+            if self.viewport.mode == "MENU_EDITOR":
+                self.viewport.menu_editor.save(path)
+                print(f"Меню успішно збережено в {path}!")
+            else:
+                self.viewport.editor.tilemap.save(path)
+                print(f"Мапу успішно збережено в {path}!")
 
     def on_play_clicked(self):
         if self.btn_play.text() == "▶ PLAY":
@@ -498,7 +654,11 @@ class MainWindow(QMainWindow):
 
             if getattr(self, 'current_selected_folder', None): 
                 self.properties_panel.show() 
-            self.viewport.set_mode("EDITOR")
+                
+            if self.btn_toggle_editor.isChecked():
+                self.viewport.set_mode("MENU_EDITOR")
+            else:
+                self.viewport.set_mode("EDITOR")
     
     def on_new_folder_clicked(self):
         index = self.tree_view.currentIndex()
