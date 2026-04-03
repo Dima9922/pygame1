@@ -1,5 +1,7 @@
 import pygame
-from PySide6.QtWidgets import QWidget
+import os
+import json
+from PySide6.QtWidgets import QWidget, QApplication
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QImage, QPainter
 from scripts.editor import Editor
@@ -20,9 +22,11 @@ class NumiViewport(QWidget):
         self.current_tile_variant = 0
         
         self.editor = Editor(self.assets) 
-        self.menu_editor = MenuEditor(self.assets)
+        self.menu_editor = MenuEditor(self.assets) 
         self.game = None
-        self.pause_menu = None 
+        
+        self.pause_ui_elements = []
+        
         self.mode = "EDITOR"
         
         self.mpos = (0, 0)
@@ -61,16 +65,18 @@ class NumiViewport(QWidget):
                 self.game = Game(self.assets, current_w, current_h)
                 
         elif new_mode == "PAUSE":
-            from scripts.menu import Menu
-            buttons = [
-                {"text": "Resume", "action": "resume"},
-                {"text": "Exit to Editor", "action": "exit_to_editor"}
-            ]
-            self.pause_menu = Menu(self, self.set_mode, "PAUSED", buttons, is_overlay=True)
+            self.pause_ui_elements = []
+            pause_path = 'data/maps/pause.json'
+            if os.path.exists(pause_path):
+                try:
+                    with open(pause_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        self.pause_ui_elements = data.get('ui_elements', [])
+                except: pass
             
         elif new_mode in ["EDITOR", "MENU_EDITOR"]:
             self.game = None
-            self.pause_menu = None
+            self.pause_ui_elements = []
             
         self.mode = new_mode
             
@@ -116,7 +122,6 @@ class NumiViewport(QWidget):
             self.mock_events.append(pygame.event.Event(pygame.KEYUP, {'key': pg_key}))
             
     def update_engine(self):
-        # 1. ЗАВЖДИ обчислюємо розміри і оновлюємо (ФІКС ДЛЯ ПОВНОГО ЕКРАНУ)
         current_w = max(1, self.width() // self.zoom)
         current_h = max(1, self.height() // self.zoom)
         
@@ -135,7 +140,6 @@ class NumiViewport(QWidget):
             self.editor.draw(self.display, mpos_virtual, self.current_tile_group, self.current_tile_variant, self.is_hovering)
             
         elif self.mode == "MENU_EDITOR": 
-            # ФІКС КООРДИНАТ ДЛЯ РЕДАКТОРА
             self.menu_editor.last_screen_w = self.display.get_width()
             self.menu_editor.last_screen_h = self.display.get_height()
             self.menu_editor.update(self.mock_events, mpos_virtual, self.current_tile_group, self.current_tile_variant, self.is_hovering)
@@ -159,10 +163,70 @@ class NumiViewport(QWidget):
                 self.game.update(self.mock_events, mpos_virtual)
                 self.game.draw(self.display, mpos_virtual)
                 
-        elif self.mode == "PAUSE" and self.game and self.pause_menu:
-            self.game.draw(self.display) 
-            self.pause_menu.update(self.mock_events, mpos_virtual)
-            self.pause_menu.draw(self.display, mpos_virtual)
+        elif self.mode == "PAUSE" and self.game:
+            self.game.draw(self.display, mpos_virtual)
+            
+            overlay = pygame.Surface(self.display.get_size(), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 150))
+            self.display.blit(overlay, (0, 0))
+            
+            menu_surf = pygame.Surface((640, 360), pygame.SRCALPHA)
+            scale = min(self.display.get_width() / 640, self.display.get_height() / 360)
+            
+            if scale > 0:
+                offset_x = (self.display.get_width() - int(640 * scale)) // 2
+                offset_y = (self.display.get_height() - int(360 * scale)) // 2
+                cmx = (mpos_virtual[0] - offset_x) / scale
+                cmy = (mpos_virtual[1] - offset_y) / scale
+                
+                for event in self.mock_events:
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        for el in self.pause_ui_elements:
+                            if el['type'] in self.assets and el['variant'] < len(self.assets[el['type']]):
+                                img = self.assets[el['type']][el['variant']]
+                                rect = pygame.Rect(el['pos'][0], el['pos'][1], img.get_width(), img.get_height())
+                                if rect.collidepoint((cmx, cmy)):
+                                    action = el.get('action', 'load_map') # Fallback
+                                    
+                                    if action == 'resume_game':
+                                        self.set_mode("PLAY")
+                                        
+                                    # ФІКС: Тепер завантажуємо мапу ПРЯМО В ГРІ, не вимикаючи режим PLAY
+                                    elif action == 'load_map':
+                                        target = el.get('target', 'menu.json')
+                                        with open('data/maps/current_play.txt', 'w') as f:
+                                            f.write(target)
+                                        self.game.load_level(f"data/maps/{target}")
+                                        self.set_mode("PLAY") # Знімаємо паузу, бо ми тепер в іншому меню/рівні
+                                        
+                                    elif action == 'quit_game':
+                                        self.timer.stop()
+                                        QApplication.instance().quit()
+                                        return
+                
+                for el in self.pause_ui_elements:
+                    if el['type'] in self.assets and el['variant'] < len(self.assets[el['type']]):
+                        img = self.assets[el['type']][el['variant']]
+                        rect = pygame.Rect(el['pos'][0], el['pos'][1], img.get_width(), img.get_height())
+                        
+                        if rect.collidepoint((cmx, cmy)):
+                            pygame.draw.rect(menu_surf, (255, 204, 0), rect.inflate(4, 4), 2, border_radius=4)
+                        
+                        menu_surf.blit(img, (el['pos'][0], el['pos'][1]))
+                        
+                        text = el.get('text', '')
+                        if text:
+                            pygame.font.init()
+                            font = pygame.font.SysFont('arial', 14, bold=True)
+                            text_surf = font.render(text, True, (255, 255, 255))
+                            shadow_surf = font.render(text, True, (0, 0, 0))
+                            text_rect = text_surf.get_rect(center=(el['pos'][0] + img.get_width()/2, el['pos'][1] + img.get_height()/2))
+                            menu_surf.blit(shadow_surf, (text_rect.x + 1, text_rect.y + 1))
+                            menu_surf.blit(text_surf, text_rect)
+                            
+                scaled_w, scaled_h = int(640 * scale), int(360 * scale)
+                scaled_menu = pygame.transform.scale(menu_surf, (scaled_w, scaled_h))
+                self.display.blit(scaled_menu, (offset_x, offset_y))
             
         self.mock_events.clear()
         self.update() 

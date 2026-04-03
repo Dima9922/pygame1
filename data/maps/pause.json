@@ -1,0 +1,28 @@
+{
+    "is_menu": true,
+    "ui_elements": [
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                247.69942196531792,
+                103.78034682080924
+            ],
+            "text": "Resume",
+            "action": "resume_game",
+            "target": "1.json"
+        },
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                248.6242774566474,
+                197.1907514450867
+            ],
+            "text": "main menu",
+            "action": "load_map",
+            "target": "menu.json"
+        }
+    ],
+    "bg_path": null
+}

@@ -82,19 +82,32 @@ class Game:
         self.tilemap = Tilemap(self, tile_size = 16)
         
         os.makedirs('data/maps', exist_ok=True)
-        self.level_list = sorted([f for f in os.listdir('data/maps') if f.endswith('.json')])
+        
+        # ФІКС: Фільтруємо мапи, щоб меню НІКОЛИ не завантажувались як ігрові рівні!
+        self.level_list = []
+        for f_name in sorted([f for f in os.listdir('data/maps') if f.endswith('.json')]):
+            try:
+                with open(os.path.join('data/maps', f_name), 'r', encoding='utf-8') as f:
+                    if not json.load(f).get('is_menu', False):
+                        self.level_list.append(f_name)
+            except: pass
+            
         self.current_level_idx = 0
+        start_map = None
         
         if os.path.exists('data/maps/current_play.txt'):
             with open('data/maps/current_play.txt', 'r') as f:
                 start_map = f.read().strip()
-                if start_map in self.level_list:
-                    self.current_level_idx = self.level_list.index(start_map)
-                    
+                
         self.screenshake = 0
         self.level_complete = False
         
-        if self.level_list:
+        # ФІКС: Тепер ми запускаємо меню безпосередньо, навіть якщо його немає у списку рівнів
+        if start_map:
+            if start_map in self.level_list:
+                self.current_level_idx = self.level_list.index(start_map)
+            self.load_level(f"data/maps/{start_map}")
+        elif self.level_list:
             self.load_level(f"data/maps/{self.level_list[self.current_level_idx]}")
 
     def resize_display(self, new_w, new_h):
@@ -267,8 +280,9 @@ class Game:
                                     with open('data/maps/current_play.txt', 'w') as f: f.write(target)
                                     self.load_level(f"data/maps/{target}")
                                 elif action == 'quit_game':
-                                    pygame.quit()
-                                    sys.exit()
+                                    from PySide6.QtWidgets import QApplication
+                                    QApplication.instance().quit()
+                                    return
                                 elif action == 'open_url':
                                     import webbrowser
                                     webbrowser.open(el.get('target', 'http://google.com'))
@@ -326,7 +340,6 @@ class Game:
                             self.dead += 1
                             self.play_sound(self.player.anim_paths.get('sfx_hit', 'hit.wav'), 'hit.wav', self.player.spawner_type)
                             self.screenshake = max(16, self.screenshake)
-                            
                 elif proj_type == 'player':
                     for enemy in self.enemies.copy():
                         if enemy.rect().collidepoint(projectile[0]):
@@ -343,7 +356,6 @@ class Game:
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
                                 if fx_key:
-                                    # ТУТ ЗМІНЕНО frame='random'
                                     self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     

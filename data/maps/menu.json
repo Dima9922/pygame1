@@ -5,23 +5,45 @@
             "type": "buttonss",
             "variant": 0,
             "pos": [
-                235.67630057803467,
-                59.38728323699422
+                237.52601156069363,
+                141.69942196531792
             ],
-            "text": "\u0432\u0438\u0445\u0456\u0434",
-            "action": "quit_game",
+            "text": "level 2",
+            "action": "load_map",
             "target": "1.json"
         },
         {
             "type": "buttonss",
             "variant": 0,
             "pos": [
-                236.60115606936415,
-                249.90751445086704
+                43.30635838150289,
+                139.84971098265896
             ],
-            "text": "Button 2",
+            "text": "level 1",
+            "action": "load_map",
+            "target": "0.json"
+        },
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                429.8959537572254,
+                139.84971098265896
+            ],
+            "text": "level 3",
             "action": "load_map",
             "target": "2.json"
+        },
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                234.55793991416306,
+                242.9785407725322
+            ],
+            "text": "exit",
+            "action": "quit_game",
+            "target": "1.json"
         }
     ],
     "bg_path": "bg/0"
