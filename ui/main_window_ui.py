@@ -27,12 +27,17 @@ def setup_ui(main_window, assets):
     
     main_window.map_combo = QComboBox()
     main_window.btn_new_map = QPushButton("+ New Map")
+    # --- НОВА КНОПКА ВИДАЛЕННЯ ---
+    main_window.btn_delete_map = QPushButton("❌ Delete Map")
+    main_window.btn_delete_map.setStyleSheet("color: #d73a49;") # Червоний текст для безпеки
     main_window.btn_save = QPushButton("Save Map")
     main_window.btn_play = QPushButton("▶ PLAY")
     
     main_window.toolbar_layout.addWidget(QLabel("Map:"))
     main_window.toolbar_layout.addWidget(main_window.map_combo)
     main_window.toolbar_layout.addWidget(main_window.btn_new_map)
+    # Додаємо кнопку на панель
+    main_window.toolbar_layout.addWidget(main_window.btn_delete_map)
     main_window.toolbar_layout.addStretch()
     main_window.toolbar_layout.addWidget(main_window.btn_save)
     main_window.toolbar_layout.addWidget(main_window.btn_play)
