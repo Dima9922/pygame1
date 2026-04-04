@@ -254,6 +254,12 @@ def setup_ui(main_window, assets):
     main_window.prop_vision_input = QSpinBox()
     main_window.prop_vision_input.setRange(1, 100)
     
+    # --- ПОЛЯ ДЛЯ NPC ---
+    main_window.prop_dialogue_label = QLabel("Dialogue Text (розділяй через ';'):")
+    main_window.prop_dialogue_input = QLineEdit("Привіт!;Як справи?")
+    main_window.prop_dialogue_sound_label = QLabel("Talk Sound File:")
+    main_window.prop_dialogue_sound_input = QLineEdit("talk.wav")
+    
     main_window.prop_spawner_layout.addWidget(main_window.prop_shoot_cb)
     main_window.prop_spawner_layout.addWidget(main_window.prop_weapon_img_label)
     main_window.prop_spawner_layout.addWidget(main_window.prop_weapon_img_input)
@@ -263,6 +269,12 @@ def setup_ui(main_window, assets):
     main_window.prop_spawner_layout.addWidget(main_window.prop_shoot_cd_input)
     main_window.prop_spawner_layout.addWidget(main_window.prop_vision_label)
     main_window.prop_spawner_layout.addWidget(main_window.prop_vision_input)
+    
+    # Додаємо в layout поля NPC
+    main_window.prop_spawner_layout.addWidget(main_window.prop_dialogue_label)
+    main_window.prop_spawner_layout.addWidget(main_window.prop_dialogue_input)
+    main_window.prop_spawner_layout.addWidget(main_window.prop_dialogue_sound_label)
+    main_window.prop_spawner_layout.addWidget(main_window.prop_dialogue_sound_input)
 
     main_window.properties_layout.addWidget(main_window.prop_spawner_container)
 

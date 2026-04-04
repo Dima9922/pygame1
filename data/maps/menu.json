@@ -5,21 +5,43 @@
             "type": "buttonss",
             "variant": 0,
             "pos": [
-                237.52601156069363,
-                141.69942196531792
+                246.77456647398844,
+                294.3005780346821
             ],
-            "text": "level 2",
-            "action": "load_map",
+            "text": "Exit",
+            "action": "quit_game",
             "target": "1.json"
         },
         {
             "type": "buttonss",
             "variant": 0,
             "pos": [
-                43.30635838150289,
-                139.84971098265896
+                382.72832369942194,
+                203.66473988439304
             ],
-            "text": "level 1",
+            "text": "Level 5",
+            "action": "load_map",
+            "target": "level 5.json"
+        },
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                127.46820809248555,
+                202.73988439306356
+            ],
+            "text": "Level 4",
+            "action": "load_map",
+            "target": "level4.json"
+        },
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                47.0057803468208,
+                125.97687861271675
+            ],
+            "text": "Level 1",
             "action": "load_map",
             "target": "start.json"
         },
@@ -27,23 +49,23 @@
             "type": "buttonss",
             "variant": 0,
             "pos": [
-                429.8959537572254,
-                139.84971098265896
+                250.47398843930637,
+                125.05202312138726
             ],
-            "text": "level 3",
+            "text": "Level 2",
             "action": "load_map",
-            "target": "2.json"
+            "target": "1.json"
         },
         {
             "type": "buttonss",
             "variant": 0,
             "pos": [
-                234.55793991416306,
-                242.9785407725322
+                451.1676300578034,
+                124.12716763005778
             ],
-            "text": "exit",
-            "action": "quit_game",
-            "target": "1.json"
+            "text": "Level 3",
+            "action": "load_map",
+            "target": "2.json"
         }
     ],
     "bg_path": "bg/0",

@@ -348,3 +348,48 @@ class Player(PhysicsEntity):
                 self.dashing = -60
             else:
                 self.dashing = 60
+                
+class NPC(PhysicsEntity):
+    def __init__(self, game, pos, size, anim_paths=None, spawner_type='npc', can_walk=True, speed=0.5, dialogue_text="Hello!", dialogue_sound="talk.wav"):
+        super().__init__(game, 'npc', pos, size, anim_paths)
+        self.spawner_type = spawner_type 
+        self.can_walk = can_walk
+        self.speed = speed  
+        self.walking = 0
+        self.dialogue_text = dialogue_text
+        self.dialogue_sound = dialogue_sound
+        self.interactable = False
+        
+    def update(self, tilemap, movement=(0, 0)):
+        if self.can_walk:
+            if self.walking:
+                if tilemap.solid_check((self.rect().centerx + (-7 if self.flip else 7), self.pos[1] + 23)):
+                    if (self.collisions['right'] or self.collisions['left']):
+                        self.flip = not self.flip
+                    else:
+                        movement = (movement[0] - self.speed if self.flip else self.speed, movement[1])
+                else:
+                    self.flip = not self.flip
+                self.walking = max(0, self.walking - 1)
+            elif random.random() < 0.01:
+                self.walking = random.randint(30, 120)
+        
+        # Перевіряємо відстань до гравця (якщо ближче ніж 40 пікселів - можна говорити)
+        dis = math.hypot(self.game.player.pos[0] - self.pos[0], self.game.player.pos[1] - self.pos[1])
+        self.interactable = (dis < 40)
+        
+        super().update(tilemap, movement=movement)
+        
+        if movement[0] != 0:
+            self.set_action('run')
+        else:
+            self.set_action('idle')
+            
+    def render(self, surf, offset=(0, 0)):
+        super().render(surf, offset=offset)
+        # Малюємо підказку [E] над головою, якщо гравець поруч і діалог ще не відкритий
+        if getattr(self, 'interactable', False) and not getattr(self.game, 'is_dialogue_active', False):
+            text_surf = self.game.font.render("[E]", True, (255, 255, 255))
+            shadow = self.game.font.render("[E]", True, (0, 0, 0))
+            surf.blit(shadow, (self.rect().centerx - offset[0] - text_surf.get_width()//2 + 1, self.rect().top - offset[1] - 15 + 1))
+            surf.blit(text_surf, (self.rect().centerx - offset[0] - text_surf.get_width()//2, self.rect().top - offset[1] - 15))

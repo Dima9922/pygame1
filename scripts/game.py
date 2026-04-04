@@ -6,7 +6,7 @@ import json
 import pygame
 
 from scripts.utils import load_image, load_images, Animation
-from scripts.entities import PhysicsEntity, Player, Enemy
+from scripts.entities import PhysicsEntity, Player, Enemy, NPC
 from scripts.tilemap import Tilemap
 from scripts.clouds import Clouds
 from scripts.particle import Particle
@@ -18,10 +18,15 @@ class Game:
         self.tile_properties = {}
         
         self.is_menu_mode = False
-        self.is_paused = False # Нова змінна для паузи
+        self.is_paused = False 
+        
+        self.is_dialogue_active = False 
+        self.dialogue_lines = []
+        self.dialogue_index = 0
+        self.active_npc = None
+        
         self.ui_elements = []
         pygame.font.init()
-        # Основний шрифт для UI, тепер розмір не такий критичний тут
         self.font = pygame.font.SysFont('arial', 14, bold=True)
         
         if os.path.exists('data/images/tiles'):
@@ -175,9 +180,11 @@ class Game:
             self.current_map_name = map_name
 
         self.is_menu_mode = False
-        self.is_paused = False # Скидаємо паузу при завантаженні рівня
+        self.is_paused = False 
+        self.is_dialogue_active = False 
         self.ui_elements = []
         self.enemies = []
+        self.npcs = [] 
         self.projectiles = []
         self.particles = []
         self.sparks = []
@@ -271,9 +278,18 @@ class Game:
                     shoot_cooldown_max=props.get('shoot_cooldown', 60),
                     vision_range=props.get('vision_range', 15) * 16 
                 ))
+            elif preset == "Friendly NPC":
+                self.npcs.append(NPC(
+                    self, spawner['pos'], (8, 15),
+                    anim_paths=anim_paths,
+                    spawner_type=folder,
+                    can_walk=props.get('can_walk', False),
+                    speed=props.get('walk_speed', 0.5),
+                    dialogue_text=props.get('dialogue_text', 'Привіт!;Як справи?'),
+                    dialogue_sound=props.get('dialogue_sound', 'talk.wav')
+                ))
 
     def update(self, events, mpos_virtual=(0,0)):
-        # --- ФІКС: Звідси повністю видалено логіку паузи, вона перенесена в draw ---
         if self.is_menu_mode:
             scale = min(self.display.get_width() / 640, self.display.get_height() / 360)
             offset_x = (self.display.get_width() - int(640 * scale)) // 2
@@ -311,6 +327,18 @@ class Game:
                                     webbrowser.open(el.get('target', 'http://google.com'))
             return
 
+        if self.is_dialogue_active:
+            for event in events:
+                if event.type == pygame.KEYDOWN and event.key in [pygame.K_e, pygame.K_RETURN, pygame.K_SPACE]:
+                    self.dialogue_index += 1
+                    if self.dialogue_index >= len(self.dialogue_lines):
+                        self.is_dialogue_active = False 
+                        self.active_npc = None
+                    else:
+                        if self.active_npc:
+                            self.play_sound(self.active_npc.dialogue_sound, 'talk.wav')
+            return 
+
         self.screenshake = max(0, self.screenshake - 1)
         if not self.dead and not getattr(self, 'level_complete', False):
             if hasattr(self.tilemap, 'check_level_exits') and self.tilemap.check_level_exits(self.player.rect()):
@@ -339,6 +367,8 @@ class Game:
         self.scroll[1] += (self.player.rect().centery - self.display.get_height() / 2 - self.scroll[1]) / 30
         
         self.clouds.update()
+        for npc in self.npcs:
+            npc.update(self.tilemap, (0, 0))
         for enemy in self.enemies.copy():
             kill = enemy.update(self.tilemap, (0, 0))
             if kill: self.enemies.remove(enemy)
@@ -380,6 +410,7 @@ class Game:
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
                                 if fx_key:
+                                    # ФІКС ТУТ: Particle(self, fx_key...) замість Particle(self.game, fx_key...)
                                     self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     
@@ -395,6 +426,22 @@ class Game:
                 if event.key in [pygame.K_UP, pygame.K_w]: self.player.jump()
                 if event.key == pygame.K_x: self.player.dash()
                 if event.key == pygame.K_SPACE: self.player.shoot()
+                
+                if event.key == pygame.K_e:
+                    for npc in self.npcs:
+                        if npc.interactable:
+                            self.is_dialogue_active = True
+                            raw_lines = npc.dialogue_text.split(';')
+                            self.dialogue_lines = [line.strip() for line in raw_lines if line.strip()]
+                            if not self.dialogue_lines:
+                                self.dialogue_lines = ["..."]
+                                
+                            self.dialogue_index = 0
+                            self.active_npc = npc
+                            self.movement = [False, False] 
+                            self.play_sound(npc.dialogue_sound, 'talk.wav')
+                            break
+                            
             if event.type == pygame.KEYUP:
                 if event.key in [pygame.K_LEFT, pygame.K_a]: self.movement[0] = False
                 if event.key in [pygame.K_RIGHT, pygame.K_d]: self.movement[1] = False
@@ -452,6 +499,7 @@ class Game:
         self.clouds.render(self.display_2, offset = render_scroll)
         self.tilemap.render(self.display, offset = render_scroll)
         
+        for npc in self.npcs: npc.render(self.display, offset = render_scroll)
         for enemy in self.enemies: enemy.render(self.display, offset = render_scroll)
         if not self.dead: self.player.render(self.display, offset = render_scroll)
         for spark in self.sparks: spark.render(self.display, offset = render_scroll)
@@ -477,63 +525,42 @@ class Game:
         self.display_2.blit(self.display, (0, 0))
         
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
-        # --- ФІКС: Малюємо гру на вікно ---
         surface.blit(self.display_2, screenshake_offset)
 
-        # --- НОВЕ: Малювання і обробка паузи ПОВЕРХ відмасштабованої гри ---
         if self.is_paused:
-            # Чорний напівпрозорий оверлей на все вікно
             overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
             surface.blit(overlay, (0, 0))
             
-            # Читаємо меню паузи з JSON
             pause_ui_elements = []
             if os.path.exists('data/maps/pause.json'):
                 try:
                     with open('data/maps/pause.json', 'r', encoding='utf-8') as f:
                         data = json.load(f)
-                        if data.get('is_menu', False):
-                            pause_ui_elements = data.get('ui_elements', [])
+                        if data.get('is_menu', False): pause_ui_elements = data.get('ui_elements', [])
                 except: pass
             
-            # Створюємо "великий" шрифт під роздільну здатність вікна
             win_w, win_h = surface.get_size()
-            big_font_size = max(18, int(18 * (win_w / 640))) # Розмір шрифту 18, якщо вікно 640x360
+            big_font_size = max(18, int(18 * (win_w / 640))) 
             big_font = pygame.font.SysFont('arial', big_font_size, bold=True)
             
-            # Обробка кліків (потрібні події вікна)
-            # Примітка: Обробка кліків у draw - це погана практика, але це найшвидший фікс.
-            # Правильно було б перенести це в update, але тоді update мав би знати розмір вікна.
-            # Оскільки рушій PySide6 використовує events=pygame.event.get(), ми можемо їх тут прочитати.
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     for el in pause_ui_elements:
-                        # Елементи в JSON в координатах 640x360. Потрібно їх масштабувати.
                         scale_x = win_w / 640
                         scale_y = win_h / 360
-                        
                         folder = el['type']
                         var = el['variant']
-                        
                         if folder in self.assets and var < len(self.assets[folder]):
                             orig_img = self.assets[folder][var]
                             orig_w, orig_h = orig_img.get_size()
-                            
                             ex, ey = el['pos']
-                            
-                            final_x = ex * scale_x
-                            final_y = ey * scale_y
-                            final_w = orig_w * scale_x
-                            final_h = orig_h * scale_y
-                            
+                            final_x, final_y = ex * scale_x, ey * scale_y
+                            final_w, final_h = orig_w * scale_x, orig_h * scale_y
                             rect = pygame.Rect(final_x, final_y, final_w, final_h)
-                            
-                            # Примітка: mpos_virtual тут - це координати МИШІ НА ВІКНІ (бо в ui/play.py ми так передаємо)
                             if rect.collidepoint(mpos_virtual):
                                 action = el.get('action', 'resume_game')
-                                if action == 'resume_game':
-                                    self.is_paused = False
+                                if action == 'resume_game': self.is_paused = False
                                 elif action == 'load_map':
                                     target = el.get('target', 'menu.json')
                                     with open('data/maps/current_play.txt', 'w') as f: f.write(target)
@@ -549,45 +576,52 @@ class Game:
                                     pygame.quit()
                                     sys.exit()
 
-            # Малюємо кнопки паузи з масштабуванням і ЧІТКИМ текстом
             for el in pause_ui_elements:
                 scale_x = win_w / 640
                 scale_y = win_h / 360
-                
                 folder = el['type']
                 var = el['variant']
                 ex, ey = el['pos']
-                
                 if folder in self.assets and var < len(self.assets[folder]):
                     orig_img = self.assets[folder][var]
                     orig_w, orig_h = orig_img.get_size()
-                    
-                    final_x = ex * scale_x
-                    final_y = ey * scale_y
-                    final_w = int(orig_w * scale_x)
-                    final_h = int(orig_h * scale_y)
-                    
-                    # Масштабуємо картинку кнопки
+                    final_x, final_y = ex * scale_x, ey * scale_y
+                    final_w, final_h = int(orig_w * scale_x), int(orig_h * scale_y)
                     scaled_btn_img = pygame.transform.scale(orig_img, (final_w, final_h))
-                    
-                    # Малюємо обводку, якщо наведено
                     rect = pygame.Rect(final_x, final_y, final_w, final_h)
                     if rect.collidepoint(mpos_virtual):
-                        # Жовта обводка
                         pygame.draw.rect(surface, (255, 204, 0), rect.inflate(4*scale_x, 4*scale_y), max(2, int(2*scale_x)), border_radius=int(4*scale_x))
-                    
                     surface.blit(scaled_btn_img, (final_x, final_y))
-                    
-                    # Малюємо ЧІТКИЙ текст поверх відмасштабованої кнопки
                     text = el.get('text', '')
                     if text:
                         text_surf = big_font.render(text, True, (255, 255, 255))
                         shadow_surf = big_font.render(text, True, (0, 0, 0))
-                        
-                        # Центруємо текст на кнопці
                         text_rect = text_surf.get_rect(center=(final_x + final_w/2, final_y + final_h/2))
-                        
-                        # Тінь
                         surface.blit(shadow_surf, (text_rect.x + max(1, int(1*scale_x)), text_rect.y + max(1, int(1*scale_y))))
-                        # Білий текст
                         surface.blit(text_surf, text_rect)
+
+        if self.is_dialogue_active and self.dialogue_index < len(self.dialogue_lines):
+            win_w, win_h = surface.get_size()
+            scale_x = win_w / 640
+            scale_y = win_h / 360
+            
+            box_w = int(500 * scale_x)
+            box_h = int(100 * scale_y)
+            box_x = (win_w - box_w) // 2
+            box_y = win_h - box_h - int(30 * scale_y)
+            
+            pygame.draw.rect(surface, (25, 25, 35), (box_x, box_y, box_w, box_h), border_radius=int(8*scale_x))
+            pygame.draw.rect(surface, (255, 204, 0), (box_x, box_y, box_w, box_h), max(2, int(2*scale_x)), border_radius=int(8*scale_x))
+            
+            big_font_size = max(18, int(18 * (win_w / 640)))
+            big_font = pygame.font.SysFont('arial', big_font_size, bold=True)
+            
+            current_line = self.dialogue_lines[self.dialogue_index]
+            
+            text_surf = big_font.render(current_line, True, (255, 255, 255))
+            text_rect = text_surf.get_rect(center=(box_x + box_w//2, box_y + box_h//2))
+            surface.blit(text_surf, text_rect)
+            
+            small_font = pygame.font.SysFont('arial', max(12, int(12 * scale_x)))
+            hint_surf = small_font.render("[E] Далі", True, (150, 150, 150))
+            surface.blit(hint_surf, (box_x + box_w - hint_surf.get_width() - 10, box_y + box_h - hint_surf.get_height() - 5))

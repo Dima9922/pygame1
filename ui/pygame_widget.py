@@ -45,11 +45,13 @@ class NumiViewport(QWidget):
             Qt.Key_Control: pygame.K_LCTRL,
             Qt.Key_W: pygame.K_w, Qt.Key_A: pygame.K_a,
             Qt.Key_S: pygame.K_s, Qt.Key_D: pygame.K_d, Qt.Key_X: pygame.K_x,
+            Qt.Key_E: pygame.K_e, # <--- Англійська E
             Qt.Key_G: pygame.K_g, Qt.Key_T: pygame.K_t, Qt.Key_O: pygame.K_o,
             1062: pygame.K_w, 1060: pygame.K_a, 
             1030: pygame.K_s, 1042: pygame.K_d, 
             1063: pygame.K_x,                   
-            1055: pygame.K_g, 1045: pygame.K_t, 1065: pygame.K_o 
+            1055: pygame.K_g, 1045: pygame.K_t, 1065: pygame.K_o,
+            1059: pygame.K_e  # <--- Українська У (на тій самій клавіші)
         }
 
     def set_current_tile(self, group, variant):
