@@ -18,8 +18,10 @@ class Game:
         self.tile_properties = {}
         
         self.is_menu_mode = False
+        self.is_paused = False # Нова змінна для паузи
         self.ui_elements = []
         pygame.font.init()
+        # Основний шрифт для UI, тепер розмір не такий критичний тут
         self.font = pygame.font.SysFont('arial', 14, bold=True)
         
         if os.path.exists('data/images/tiles'):
@@ -83,32 +85,40 @@ class Game:
         
         os.makedirs('data/maps', exist_ok=True)
         
-        # ФІКС: Фільтруємо мапи, щоб меню НІКОЛИ не завантажувались як ігрові рівні!
         self.level_list = []
+        map_objects = []
+        
         for f_name in sorted([f for f in os.listdir('data/maps') if f.endswith('.json')]):
             try:
                 with open(os.path.join('data/maps', f_name), 'r', encoding='utf-8') as f:
-                    if not json.load(f).get('is_menu', False):
-                        self.level_list.append(f_name)
+                    data = json.load(f)
+                    if not data.get('ignore_in_progression', False):
+                        map_objects.append({
+                            'name': f_name,
+                            'order': data.get('level_order', 999) 
+                        })
             except: pass
             
+        map_objects.sort(key=lambda x: (x['order'], x['name']))
+        self.level_list = [x['name'] for x in map_objects]
+        
         self.current_level_idx = 0
-        start_map = None
+        self.current_map_name = None
         
         if os.path.exists('data/maps/current_play.txt'):
             with open('data/maps/current_play.txt', 'r') as f:
-                start_map = f.read().strip()
+                self.current_map_name = f.read().strip()
                 
         self.screenshake = 0
         self.level_complete = False
         
-        # ФІКС: Тепер ми запускаємо меню безпосередньо, навіть якщо його немає у списку рівнів
-        if start_map:
-            if start_map in self.level_list:
-                self.current_level_idx = self.level_list.index(start_map)
-            self.load_level(f"data/maps/{start_map}")
+        if self.current_map_name:
+            if self.current_map_name in self.level_list:
+                self.current_level_idx = self.level_list.index(self.current_map_name)
+            self.load_level(f"data/maps/{self.current_map_name}")
         elif self.level_list:
-            self.load_level(f"data/maps/{self.level_list[self.current_level_idx]}")
+            self.current_map_name = self.level_list[0]
+            self.load_level(f"data/maps/{self.current_map_name}")
 
     def resize_display(self, new_w, new_h):
         self.display = pygame.Surface((new_w, new_h), pygame.SRCALPHA)
@@ -159,7 +169,13 @@ class Game:
                 f_sound.play()
 
     def load_level(self, map_path):
+        map_name = os.path.basename(map_path)
+        if hasattr(self, 'level_list') and map_name in self.level_list:
+            self.current_level_idx = self.level_list.index(map_name)
+            self.current_map_name = map_name
+
         self.is_menu_mode = False
+        self.is_paused = False # Скидаємо паузу при завантаженні рівня
         self.ui_elements = []
         self.enemies = []
         self.projectiles = []
@@ -186,7 +202,8 @@ class Game:
                     return 
         except FileNotFoundError: pass
 
-        self.tilemap.load(map_path)
+        try: self.tilemap.load(map_path)
+        except (FileNotFoundError, KeyError): pass
             
         pygame.mixer.music.stop()
         level_music = getattr(self.tilemap, 'bg_music', None)
@@ -256,6 +273,7 @@ class Game:
                 ))
 
     def update(self, events, mpos_virtual=(0,0)):
+        # --- ФІКС: Звідси повністю видалено логіку паузи, вона перенесена в draw ---
         if self.is_menu_mode:
             scale = min(self.display.get_width() / 640, self.display.get_height() / 360)
             offset_x = (self.display.get_width() - int(640 * scale)) // 2
@@ -280,9 +298,14 @@ class Game:
                                     with open('data/maps/current_play.txt', 'w') as f: f.write(target)
                                     self.load_level(f"data/maps/{target}")
                                 elif action == 'quit_game':
-                                    from PySide6.QtWidgets import QApplication
-                                    QApplication.instance().quit()
-                                    return
+                                    import sys
+                                    if 'PySide6' in sys.modules:
+                                        from PySide6.QtWidgets import QApplication
+                                        if QApplication.instance():
+                                            QApplication.instance().quit()
+                                            return
+                                    pygame.quit()
+                                    sys.exit()
                                 elif action == 'open_url':
                                     import webbrowser
                                     webbrowser.open(el.get('target', 'http://google.com'))
@@ -298,15 +321,16 @@ class Game:
             if self.transition > 30:
                 if self.level_list:
                     self.current_level_idx = (self.current_level_idx + 1) % len(self.level_list)
-                    self.load_level(f"data/maps/{self.level_list[self.current_level_idx]}")
+                    self.current_map_name = self.level_list[self.current_level_idx]
+                    self.load_level(f"data/maps/{self.current_map_name}")
                 self.level_complete = False
         elif self.dead:
             self.dead += 1
             if self.dead >= 10:
                 self.transition = min(30, self.transition + 1)
             if self.dead > 40:
-                if self.level_list:
-                    self.load_level(f"data/maps/{self.level_list[self.current_level_idx]}")
+                if self.current_map_name:
+                    self.load_level(f"data/maps/{self.current_map_name}")
         else:
             if self.transition < 0:
                 self.transition += 1
@@ -453,4 +477,117 @@ class Game:
         self.display_2.blit(self.display, (0, 0))
         
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
+        # --- ФІКС: Малюємо гру на вікно ---
         surface.blit(self.display_2, screenshake_offset)
+
+        # --- НОВЕ: Малювання і обробка паузи ПОВЕРХ відмасштабованої гри ---
+        if self.is_paused:
+            # Чорний напівпрозорий оверлей на все вікно
+            overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))
+            surface.blit(overlay, (0, 0))
+            
+            # Читаємо меню паузи з JSON
+            pause_ui_elements = []
+            if os.path.exists('data/maps/pause.json'):
+                try:
+                    with open('data/maps/pause.json', 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        if data.get('is_menu', False):
+                            pause_ui_elements = data.get('ui_elements', [])
+                except: pass
+            
+            # Створюємо "великий" шрифт під роздільну здатність вікна
+            win_w, win_h = surface.get_size()
+            big_font_size = max(18, int(18 * (win_w / 640))) # Розмір шрифту 18, якщо вікно 640x360
+            big_font = pygame.font.SysFont('arial', big_font_size, bold=True)
+            
+            # Обробка кліків (потрібні події вікна)
+            # Примітка: Обробка кліків у draw - це погана практика, але це найшвидший фікс.
+            # Правильно було б перенести це в update, але тоді update мав би знати розмір вікна.
+            # Оскільки рушій PySide6 використовує events=pygame.event.get(), ми можемо їх тут прочитати.
+            for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    for el in pause_ui_elements:
+                        # Елементи в JSON в координатах 640x360. Потрібно їх масштабувати.
+                        scale_x = win_w / 640
+                        scale_y = win_h / 360
+                        
+                        folder = el['type']
+                        var = el['variant']
+                        
+                        if folder in self.assets and var < len(self.assets[folder]):
+                            orig_img = self.assets[folder][var]
+                            orig_w, orig_h = orig_img.get_size()
+                            
+                            ex, ey = el['pos']
+                            
+                            final_x = ex * scale_x
+                            final_y = ey * scale_y
+                            final_w = orig_w * scale_x
+                            final_h = orig_h * scale_y
+                            
+                            rect = pygame.Rect(final_x, final_y, final_w, final_h)
+                            
+                            # Примітка: mpos_virtual тут - це координати МИШІ НА ВІКНІ (бо в ui/play.py ми так передаємо)
+                            if rect.collidepoint(mpos_virtual):
+                                action = el.get('action', 'resume_game')
+                                if action == 'resume_game':
+                                    self.is_paused = False
+                                elif action == 'load_map':
+                                    target = el.get('target', 'menu.json')
+                                    with open('data/maps/current_play.txt', 'w') as f: f.write(target)
+                                    self.load_level(f"data/maps/{target}")
+                                    self.is_paused = False
+                                elif action == 'quit_game':
+                                    import sys
+                                    if 'PySide6' in sys.modules:
+                                        from PySide6.QtWidgets import QApplication
+                                        if QApplication.instance():
+                                            QApplication.instance().quit()
+                                            return
+                                    pygame.quit()
+                                    sys.exit()
+
+            # Малюємо кнопки паузи з масштабуванням і ЧІТКИМ текстом
+            for el in pause_ui_elements:
+                scale_x = win_w / 640
+                scale_y = win_h / 360
+                
+                folder = el['type']
+                var = el['variant']
+                ex, ey = el['pos']
+                
+                if folder in self.assets and var < len(self.assets[folder]):
+                    orig_img = self.assets[folder][var]
+                    orig_w, orig_h = orig_img.get_size()
+                    
+                    final_x = ex * scale_x
+                    final_y = ey * scale_y
+                    final_w = int(orig_w * scale_x)
+                    final_h = int(orig_h * scale_y)
+                    
+                    # Масштабуємо картинку кнопки
+                    scaled_btn_img = pygame.transform.scale(orig_img, (final_w, final_h))
+                    
+                    # Малюємо обводку, якщо наведено
+                    rect = pygame.Rect(final_x, final_y, final_w, final_h)
+                    if rect.collidepoint(mpos_virtual):
+                        # Жовта обводка
+                        pygame.draw.rect(surface, (255, 204, 0), rect.inflate(4*scale_x, 4*scale_y), max(2, int(2*scale_x)), border_radius=int(4*scale_x))
+                    
+                    surface.blit(scaled_btn_img, (final_x, final_y))
+                    
+                    # Малюємо ЧІТКИЙ текст поверх відмасштабованої кнопки
+                    text = el.get('text', '')
+                    if text:
+                        text_surf = big_font.render(text, True, (255, 255, 255))
+                        shadow_surf = big_font.render(text, True, (0, 0, 0))
+                        
+                        # Центруємо текст на кнопці
+                        text_rect = text_surf.get_rect(center=(final_x + final_w/2, final_y + final_h/2))
+                        
+                        # Тінь
+                        surface.blit(shadow_surf, (text_rect.x + max(1, int(1*scale_x)), text_rect.y + max(1, int(1*scale_y))))
+                        # Білий текст
+                        surface.blit(text_surf, text_rect)

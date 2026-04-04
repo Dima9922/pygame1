@@ -31,6 +31,6 @@
     "can_dash": true,
     "walk_speed": 1.1,
     "jump_height": 3,
-    "shoot_cooldown": 90,
+    "shoot_cooldown": 50,
     "vision_range": 9
 }

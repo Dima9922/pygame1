@@ -3,13 +3,187 @@ import os
 import shutil
 import json
 import pygame
-from PySide6.QtWidgets import (QMainWindow, QInputDialog, QFileDialog, QMessageBox, QApplication, QMenu, QComboBox, QCheckBox, QListWidgetItem, QPushButton, QHBoxLayout, QLabel, QSlider, QLineEdit)
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtWidgets import (QMainWindow, QInputDialog, QFileDialog, QMessageBox, QApplication, QMenu, QComboBox, QCheckBox, QListWidgetItem, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QLineEdit, QDialog, QFormLayout, QDialogButtonBox, QSpinBox, QListWidget, QAbstractItemView, QTextEdit, QProgressBar)
+from PySide6.QtCore import QSize, Qt, QProcess
 from PySide6.QtGui import QIcon, QPixmap, QImage
 from scripts.utils import load_images
 from ui.main_window_ui import setup_ui, create_item
 
 valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.webp')
+
+class BuildDialog(QDialog):
+    def __init__(self, dest_path, game_name, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"🚀 Compiling {game_name}...")
+        self.resize(700, 450)
+        self.dest_path = dest_path
+        self.game_name = game_name
+        
+        self.layout = QVBoxLayout(self)
+        
+        info_label = QLabel("Будь ласка, зачекайте. Це може зайняти 1-3 хвилини...")
+        info_label.setStyleSheet("font-weight: bold; color: #fff;")
+        self.layout.addWidget(info_label)
+        
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        self.log_text.setStyleSheet("background-color: #1e1e1e; color: #00ff00; font-family: Consolas, monospace;")
+        self.layout.addWidget(self.log_text)
+        
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0) 
+        self.progress.setTextVisible(False)
+        self.layout.addWidget(self.progress)
+        
+        self.btn_close = QPushButton("Cancel")
+        self.btn_close.clicked.connect(self.close)
+        self.layout.addWidget(self.btn_close)
+        
+        self.process = QProcess(self)
+        self.process.readyReadStandardOutput.connect(self.handle_stdout)
+        self.process.readyReadStandardError.connect(self.handle_stderr)
+        self.process.finished.connect(self.process_finished)
+        
+    def start_build(self):
+        if not os.path.exists("play.py"):
+            self.log_text.append("❌ ПОМИЛКА: Файл 'play.py' не знайдено в головній папці!\nБез нього неможливо зібрати гру.")
+            self.progress.setRange(0, 100)
+            self.progress.setValue(100)
+            self.progress.setStyleSheet("QProgressBar::chunk { background-color: red; }")
+            self.btn_close.setText("Close")
+            return
+            
+        self.log_text.append("🔄 Підготовка файлів...")
+        self.log_text.append(f"📦 Назва гри: {self.game_name}")
+        self.log_text.append("⏳ Запуск PyInstaller (Компіляція)...\n" + "-"*50)
+        
+        command = sys.executable
+        args = [
+            "-m", "PyInstaller",
+            "--noconfirm", 
+            "--noconsole", 
+            "--name", self.game_name, 
+            "--add-data", "data;data",
+            "--add-data", "scripts;scripts",
+            "play.py"
+        ]
+        self.process.start(command, args)
+        
+    def handle_stdout(self):
+        data = self.process.readAllStandardOutput()
+        text = data.data().decode('utf-8', errors='replace')
+        self.log_text.append(text.strip())
+        scrollbar = self.log_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+        
+    def handle_stderr(self):
+        data = self.process.readAllStandardError()
+        text = data.data().decode('utf-8', errors='replace')
+        self.log_text.append(text.strip())
+        scrollbar = self.log_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+        
+    def process_finished(self, exitCode, exitStatus):
+        self.progress.setRange(0, 100)
+        self.progress.setValue(100)
+        
+        if exitCode == 0:
+            self.progress.setStyleSheet("QProgressBar::chunk { background-color: #28a745; }")
+            self.log_text.append("-"*50 + "\n✅ Компіляція завершена успішно!")
+            self.log_text.append("🚚 Копіювання готової гри в обрану папку...")
+            
+            src_dir = os.path.join("dist", self.game_name)
+            final_dest = os.path.join(self.dest_path, self.game_name)
+            
+            if os.path.exists(src_dir):
+                try:
+                    if os.path.exists(final_dest):
+                        shutil.rmtree(final_dest) 
+                    shutil.copytree(src_dir, final_dest)
+                    
+                    self.log_text.append(f"🎉 ГОТОВО! Твоя гра знаходиться тут:\n👉 {final_dest}")
+                    self.btn_close.setText("Finish (Відкрити папку)")
+                    
+                    self.btn_close.clicked.disconnect()
+                    self.btn_close.clicked.connect(lambda: self.open_folder(final_dest))
+                except Exception as e:
+                    self.log_text.append(f"❌ Помилка при копіюванні: {e}")
+            else:
+                self.log_text.append("❌ Помилка: Папку dist не знайдено.")
+        else:
+            self.progress.setStyleSheet("QProgressBar::chunk { background-color: red; }")
+            self.log_text.append(f"\n❌ Компіляція завершилася з помилкою (Код {exitCode}).")
+            self.btn_close.setText("Close")
+            
+    def open_folder(self, path):
+        import subprocess
+        subprocess.Popen(f'explorer "{os.path.normpath(path)}"')
+        self.close()
+
+class LevelSequenceDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("🚥 Level Sequence Manager")
+        self.resize(400, 500)
+        self.layout = QVBoxLayout(self)
+        
+        info_label = QLabel("Перетягуй мапи мишкою, щоб змінити порядок.\n☑ Галочка = Грати в кампанії | ☐ Пусто = Ігнорувати (для Паузи)")
+        info_label.setStyleSheet("color: #aaa; font-style: italic; margin-bottom: 5px;")
+        self.layout.addWidget(info_label)
+        
+        self.list_widget = QListWidget()
+        self.list_widget.setDragDropMode(QAbstractItemView.InternalMove)
+        self.list_widget.setStyleSheet("QListWidget::item { padding: 5px; border-bottom: 1px solid #444; }")
+        self.layout.addWidget(self.list_widget)
+        
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        self.buttons.accepted.connect(self.save_sequence)
+        self.buttons.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttons)
+        
+        self.load_maps()
+
+    def load_maps(self):
+        map_files = [f for f in os.listdir('data/maps') if f.endswith('.json')]
+        map_data_list = []
+        
+        for f_name in map_files:
+            path = f'data/maps/{f_name}'
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    order = data.get('level_order', 999)
+                    ignore = data.get('ignore_in_progression', False)
+                    map_data_list.append((order, f_name, ignore))
+            except: pass
+            
+        map_data_list.sort(key=lambda x: x[0])
+        
+        for order, f_name, ignore in map_data_list:
+            item = QListWidgetItem(f_name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsDragEnabled)
+            item.setCheckState(Qt.Unchecked if ignore else Qt.Checked)
+            self.list_widget.addItem(item)
+
+    def save_sequence(self):
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            f_name = item.text()
+            ignore = (item.checkState() == Qt.Unchecked) 
+            
+            path = f'data/maps/{f_name}'
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        
+                    data['level_order'] = i
+                    data['ignore_in_progression'] = ignore
+                    
+                    with open(path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, ensure_ascii=False, indent=4)
+                except: pass
+        self.accept()
 
 class MainWindow(QMainWindow):
     def __init__(self, assets):
@@ -21,7 +195,6 @@ class MainWindow(QMainWindow):
         
         setup_ui(self, assets)
         
-        # НОВЕ: Динамічно додаємо поле для анімації смерті в контейнер спавнера
         self.prop_anim_die_label = QLabel("Death Effect (Anim):")
         self.prop_anim_die_input = QLineEdit("particle/particle")
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_label)
@@ -32,6 +205,17 @@ class MainWindow(QMainWindow):
         self.btn_toggle_editor.setToolTip("Switch between Level Editor and UI Editor")
         self.toolbar_layout.insertWidget(4, self.btn_toggle_editor)
         self.btn_toggle_editor.toggled.connect(self.on_editor_mode_toggled)
+        
+        self.btn_level_sequence = QPushButton("🚥 Level Sequence")
+        self.btn_level_sequence.setToolTip("Manage Level Order & Progression")
+        self.toolbar_layout.insertWidget(5, self.btn_level_sequence)
+        self.btn_level_sequence.clicked.connect(self.open_level_sequence)
+        
+        self.btn_build_game = QPushButton("🚀 Build Game")
+        self.btn_build_game.setToolTip("Compile game to .exe and export")
+        self.btn_build_game.setStyleSheet("background-color: #007acc; color: white; font-weight: bold;")
+        self.toolbar_layout.insertWidget(6, self.btn_build_game)
+        self.btn_build_game.clicked.connect(self.on_build_game_clicked)
         
         os.makedirs('data/maps', exist_ok=True)
         if os.path.exists('map.json') and not os.path.exists('data/maps/0.json'):
@@ -70,7 +254,7 @@ class MainWindow(QMainWindow):
                   self.prop_weapon_img_input, self.prop_projectile_img_input,
                   self.prop_sfx_hit_input, self.prop_sfx_jump_input, 
                   self.prop_sfx_dash_input, self.prop_sfx_shoot_input,
-                  self.prop_anim_die_input] # ДОДАНО СЮДИ
+                  self.prop_anim_die_input] 
         for input_field in inputs:
             input_field.textChanged.connect(self.save_folder_properties)
         
@@ -84,7 +268,27 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'prop_ui_text_input'):
             self.prop_ui_text_input.textChanged.connect(self.save_folder_properties)
             self.prop_ui_action_combo.currentIndexChanged.connect(self.save_folder_properties)
-            self.prop_ui_target_input.textChanged.connect(self.save_folder_properties)
+            if isinstance(self.prop_ui_target_input, QComboBox):
+                self.prop_ui_target_input.currentTextChanged.connect(self.save_folder_properties)
+
+    def on_build_game_clicked(self):
+        self.on_save_clicked() 
+        game_name, ok = QInputDialog.getText(self, "Build Game", "Як назвати гру? (тільки англійські літери):", text="MyAwesomeGame")
+        if not ok or not game_name:
+            return
+            
+        dest_dir = QFileDialog.getExistingDirectory(self, "Виберіть папку, куди зберегти готову гру")
+        if dest_dir:
+            dialog = BuildDialog(dest_dir, game_name, self)
+            dialog.show()
+            dialog.start_build()
+
+    def open_level_sequence(self):
+        self.on_save_clicked()
+        dialog = LevelSequenceDialog(self)
+        if dialog.exec():
+            self.update_map_list()
+            print("Порядок рівнів успішно оновлено!")
             
     def on_editor_mode_toggled(self, checked):
         if checked:
@@ -136,13 +340,21 @@ class MainWindow(QMainWindow):
             path = f'data/maps/{default_name}'
             with open(path, 'w') as f:
                 if is_menu_mode:
-                    json.dump({'is_menu': True, 'ui_elements': []}, f)
+                    json.dump({'is_menu': True, 'ui_elements': [], 'ignore_in_progression': True}, f)
                 else:
-                    json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': []}, f)
+                    json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': [], 'level_order': 999, 'ignore_in_progression': False}, f)
             valid_maps = [default_name]
             
         self.map_combo.addItems(valid_maps)
         self.map_combo.blockSignals(False)
+
+        if hasattr(self, 'prop_ui_target_input') and isinstance(self.prop_ui_target_input, QComboBox):
+            current_target = self.prop_ui_target_input.currentText()
+            self.prop_ui_target_input.blockSignals(True)
+            self.prop_ui_target_input.clear()
+            self.prop_ui_target_input.addItems(map_files)
+            self.prop_ui_target_input.setCurrentText(current_target)
+            self.prop_ui_target_input.blockSignals(False)
 
     def on_map_changed(self, map_name):
         if map_name:
@@ -179,10 +391,10 @@ class MainWindow(QMainWindow):
             if not os.path.exists(path):
                 if self.btn_toggle_editor.isChecked():
                     with open(path, 'w') as f:
-                        json.dump({'is_menu': True, 'ui_elements': []}, f)
+                        json.dump({'is_menu': True, 'ui_elements': [], 'ignore_in_progression': True}, f)
                 else:
                     with open(path, 'w') as f:
-                        json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': []}, f)
+                        json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': [], 'level_order': 999, 'ignore_in_progression': False}, f)
                         
                 self.update_map_list()
                 self.map_combo.setCurrentText(file_name)
@@ -374,7 +586,10 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'prop_ui_text_input'):
                     self.prop_ui_text_input.setText(data.get('ui_text', 'Button'))
                     self.prop_ui_action_combo.setCurrentText(data.get('ui_action', 'load_map'))
-                    self.prop_ui_target_input.setText(data.get('ui_target', '1.json'))
+                    if isinstance(self.prop_ui_target_input, QComboBox):
+                        self.prop_ui_target_input.setCurrentText(data.get('ui_target', '1.json'))
+                    else:
+                        self.prop_ui_target_input.setText(data.get('ui_target', '1.json'))
                 
                 self.prop_anim_idle_input.setText(data.get('anim_idle', 'enemy/idle'))
                 self.prop_anim_walk_input.setText(data.get('anim_walk', 'enemy/run'))
@@ -435,7 +650,14 @@ class MainWindow(QMainWindow):
             self.prop_collision_cb.setChecked(True)
             self.prop_visible_cb.setChecked(True)
             self.prop_walk_cb.setChecked(False)
-            self.prop_vision_input.setValue(15)
+            self.prop_shoot_cb.setChecked(False)
+            self.prop_jump_cb.setChecked(False)
+            self.prop_wall_jump_cb.setChecked(True)
+            self.prop_dash_cb.setChecked(True)
+            self.prop_speed_input.setValue(1.0)
+            self.prop_jump_input.setValue(3)
+            self.prop_shoot_cd_input.setValue(60)
+            self.prop_vision_input.setValue(15) 
             
         self.toggle_properties_ui()
         for w in widgets: w.blockSignals(False)
@@ -448,7 +670,10 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'prop_ui_text_input'):
                     el['text'] = self.prop_ui_text_input.text()
                     el['action'] = self.prop_ui_action_combo.currentText()
-                    el['target'] = self.prop_ui_target_input.text()
+                    if isinstance(self.prop_ui_target_input, QComboBox):
+                        el['target'] = self.prop_ui_target_input.currentText()
+                    else:
+                        el['target'] = self.prop_ui_target_input.text()
             return
         
         if not self.current_selected_folder: return
@@ -465,6 +690,13 @@ class MainWindow(QMainWindow):
                 self.prop_sfx_dash_input.text(): self.prop_sfx_dash_slider.value(),
                 self.prop_sfx_shoot_input.text(): self.prop_sfx_shoot_slider.value()
             }
+            
+        target_val = '1.json'
+        if hasattr(self, 'prop_ui_target_input'):
+            if isinstance(self.prop_ui_target_input, QComboBox):
+                target_val = self.prop_ui_target_input.currentText()
+            else:
+                target_val = self.prop_ui_target_input.text()
         
         data = {
             'type': self.prop_type_combo.currentText(),
@@ -474,7 +706,7 @@ class MainWindow(QMainWindow):
             'anim_jump': self.prop_anim_jump_input.text(),
             'anim_dash': self.prop_anim_dash_input.text(),
             'anim_wall_slide': self.prop_anim_wall_slide_input.text(),
-            'anim_die': self.prop_anim_die_input.text(), # ДОДАНО СЮДИ
+            'anim_die': self.prop_anim_die_input.text(), 
             'weapon_img': self.prop_weapon_img_input.text(),
             'projectile_img': self.prop_projectile_img_input.text(),
             'sfx_hit': self.prop_sfx_hit_input.text() if hasattr(self, 'prop_sfx_hit_input') else 'hit.wav',
@@ -485,7 +717,7 @@ class MainWindow(QMainWindow):
             
             'ui_text': self.prop_ui_text_input.text() if hasattr(self, 'prop_ui_text_input') else 'Button',
             'ui_action': self.prop_ui_action_combo.currentText() if hasattr(self, 'prop_ui_action_combo') else 'load_map',
-            'ui_target': self.prop_ui_target_input.text() if hasattr(self, 'prop_ui_target_input') else '1.json',
+            'ui_target': target_val,
             
             'collision': False if self.prop_type_combo.currentText() in ["Kill Zone", "Spawner", "Background", "Level Exit", "UI Button"] else self.prop_collision_cb.isChecked(),
             'is_visible': self.prop_visible_cb.isChecked(), 
@@ -520,7 +752,11 @@ class MainWindow(QMainWindow):
                 
                 self.prop_ui_text_input.setText(el.get('text', 'Button'))
                 self.prop_ui_action_combo.setCurrentText(el.get('action', 'load_map'))
-                self.prop_ui_target_input.setText(el.get('target', '1.json'))
+                
+                if isinstance(self.prop_ui_target_input, QComboBox):
+                    self.prop_ui_target_input.setCurrentText(el.get('target', '1.json'))
+                else:
+                    self.prop_ui_target_input.setText(el.get('target', '1.json'))
                 
                 self.prop_ui_text_input.blockSignals(False)
                 self.prop_ui_action_combo.blockSignals(False)
@@ -605,16 +841,42 @@ class MainWindow(QMainWindow):
         else:
             self.viewport.set_current_tile(None, 0)
 
+    # --- ФІКС 2: Збереження мапи з ПАМ'ЯТТЮ порядку ---
     def on_save_clicked(self):
         map_name = self.map_combo.currentText()
         if map_name:
             path = f'data/maps/{map_name}'
+            
+            # Читаємо старі дані, щоб запам'ятати порядок
+            existing_data = {}
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        existing_data = json.load(f)
+                except: pass
+                
+            # Зберігаємо мапу (це перезапише JSON повністю)
             if self.viewport.mode == "MENU_EDITOR":
                 self.viewport.menu_editor.save(path)
                 print(f"Меню успішно збережено в {path}!")
             else:
                 self.viewport.editor.tilemap.save(path)
                 print(f"Мапу успішно збережено в {path}!")
+                
+            # Повертаємо наші налаштування порядку назад у файл
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        new_data = json.load(f)
+                        
+                    if 'level_order' in existing_data:
+                        new_data['level_order'] = existing_data['level_order']
+                    if 'ignore_in_progression' in existing_data:
+                        new_data['ignore_in_progression'] = existing_data['ignore_in_progression']
+                        
+                    with open(path, 'w', encoding='utf-8') as f:
+                        json.dump(new_data, f, ensure_ascii=False, indent=4)
+                except: pass
 
     def on_play_clicked(self):
         if self.btn_play.text() == "▶ PLAY":

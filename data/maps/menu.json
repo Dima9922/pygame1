@@ -21,7 +21,7 @@
             ],
             "text": "level 1",
             "action": "load_map",
-            "target": "0.json"
+            "target": "start.json"
         },
         {
             "type": "buttonss",
@@ -46,5 +46,7 @@
             "target": "1.json"
         }
     ],
-    "bg_path": "bg/0"
+    "bg_path": "bg/0",
+    "level_order": 0,
+    "ignore_in_progression": false
 }

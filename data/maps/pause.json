@@ -24,5 +24,7 @@
             "target": "menu.json"
         }
     ],
-    "bg_path": null
+    "bg_path": null,
+    "level_order": 5,
+    "ignore_in_progression": true
 }

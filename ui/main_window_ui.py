@@ -277,7 +277,8 @@ def setup_ui(main_window, assets):
     main_window.prop_ui_action_combo = QComboBox()
     main_window.prop_ui_action_combo.addItems(["load_map", "open_url", "quit_game", "resume_game"])
     main_window.prop_ui_target_label = QLabel("Target (Map/URL):")
-    main_window.prop_ui_target_input = QLineEdit()
+    main_window.prop_ui_target_input = QComboBox()
+    main_window.prop_ui_target_input.setEditable(True)
 
     main_window.prop_ui_btn_layout.addWidget(main_window.prop_ui_text_label)
     main_window.prop_ui_btn_layout.addWidget(main_window.prop_ui_text_input)

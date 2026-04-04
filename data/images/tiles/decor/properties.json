@@ -1,12 +1,36 @@
 {
     "type": "Static Blocks",
     "preset": "Player",
+    "anim_idle": "enemy/idle",
+    "anim_walk": "enemy/run",
+    "anim_jump": "player/jump",
+    "anim_dash": "player/slide",
+    "anim_wall_slide": "player/wall_slide",
+    "anim_die": "particle/particle",
+    "weapon_img": "gun.png",
+    "projectile_img": "projectile.png",
+    "sfx_hit": "hit.wav",
+    "sfx_jump": "jump.wav",
+    "sfx_dash": "dash.wav",
+    "sfx_shoot": "shoot.wav",
+    "sfx_volumes": {
+        "hit.wav": 60,
+        "jump.wav": 60,
+        "dash.wav": 60,
+        "shoot.wav": 60
+    },
+    "ui_text": "Button",
+    "ui_action": "load_map",
+    "ui_target": "1.json",
     "collision": false,
+    "is_visible": true,
     "can_walk": false,
     "can_shoot": false,
     "can_jump": false,
     "can_wall_jump": false,
+    "can_dash": true,
     "walk_speed": 0.1,
     "jump_height": 1,
-    "shoot_cooldown": 10
+    "shoot_cooldown": 10,
+    "vision_range": 15
 }
