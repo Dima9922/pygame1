@@ -393,3 +393,29 @@ class NPC(PhysicsEntity):
             shadow = self.game.font.render("[E]", True, (0, 0, 0))
             surf.blit(shadow, (self.rect().centerx - offset[0] - text_surf.get_width()//2 + 1, self.rect().top - offset[1] - 15 + 1))
             surf.blit(text_surf, (self.rect().centerx - offset[0] - text_surf.get_width()//2, self.rect().top - offset[1] - 15))
+
+class Collectible(PhysicsEntity):
+    def __init__(self, game, pos, size, anim_paths=None, c_type='coin', value=1, spawner_type=''):
+        # Успадковуємося від базового класу (як Гравець чи NPC)
+        super().__init__(game, 'collectible', pos, size, anim_paths)
+        
+        self.type = c_type
+        self.value = value
+        self.spawner_type = spawner_type
+        
+        # PhysicsEntity сам знайде картинку з anim_paths['idle']
+        self.set_action('idle')
+        
+    def update(self, tilemap=None, movement=(0,0)):
+        # ПЕРЕВИЗНАЧАЄМО update, щоб вимкнути гравітацію та перевірку стін.
+        # Монетці потрібна ТІЛЬКИ зміна кадрів анімації.
+        if hasattr(self, 'animation'):
+            self.animation.update()
+            
+    def render(self, surf, offset=(0, 0)):
+        # Малюємо ідеально по центру клітинки 16x16
+        if hasattr(self, 'animation'):
+            img = self.animation.img()
+            draw_x = self.pos[0] + (16 - img.get_width()) // 2 - offset[0]
+            draw_y = self.pos[1] + (16 - img.get_height()) // 2 - offset[1]
+            surf.blit(img, (draw_x, draw_y))

@@ -18,7 +18,6 @@ class BuildDialog(QDialog):
         self.resize(700, 450)
         self.dest_path = dest_path
         self.game_name = game_name
-        
         self.layout = QVBoxLayout(self)
         
         info_label = QLabel("Збираємо гру... Це займе всього пару секунд!")
@@ -46,7 +45,6 @@ class BuildDialog(QDialog):
         
     def start_build(self):
         from PySide6.QtCore import QTimer
-        
         engine_dir = self.get_engine_dir()
         template_path = os.path.join(engine_dir, "template")
         
@@ -61,14 +59,12 @@ class BuildDialog(QDialog):
         self.log_text.append("🔄 Підготовка файлів...")
         self.log_text.append(f"📦 Назва гри: {self.game_name}")
         self.log_text.append("⏳ Створення гри з шаблону...\n" + "-"*50)
-        
         QTimer.singleShot(100, self.execute_build)
         
     def execute_build(self):
         try:
             engine_dir = self.get_engine_dir()
             template_path = os.path.join(engine_dir, "template")
-            
             final_dest = os.path.join(self.dest_path, self.game_name)
             if os.path.exists(final_dest):
                 shutil.rmtree(final_dest)
@@ -81,20 +77,15 @@ class BuildDialog(QDialog):
             self.log_text.append("🎨 Додавання твоїх рівнів та ассетів...")
             
             dest_data = os.path.join(final_dest, "_internal", "data")
-            if not os.path.exists(dest_data):
-                dest_data = os.path.join(final_dest, "data")
-                
-            if os.path.exists(dest_data):
-                shutil.rmtree(dest_data)
-                
+            if not os.path.exists(dest_data): dest_data = os.path.join(final_dest, "data")
+            if os.path.exists(dest_data): shutil.rmtree(dest_data)
             shutil.copytree("data", dest_data)
             
             self.progress.setValue(80)
             self.log_text.append("📝 Перейменування файлу запуску...")
             old_exe = os.path.join(final_dest, "play.exe")
             new_exe = os.path.join(final_dest, f"{self.game_name}.exe")
-            if os.path.exists(old_exe):
-                os.rename(old_exe, new_exe)
+            if os.path.exists(old_exe): os.rename(old_exe, new_exe)
                 
             self.progress.setValue(100)
             self.progress.setStyleSheet("QProgressBar::chunk { background-color: #28a745; }")
@@ -122,7 +113,6 @@ class LevelSequenceDialog(QDialog):
         self.setWindowTitle("🚥 Level Sequence Manager")
         self.resize(400, 500)
         self.layout = QVBoxLayout(self)
-        
         info_label = QLabel("Перетягуй мапи мишкою, щоб змінити порядок.\n☑ Галочка = Грати в кампанії | ☐ Пусто = Ігнорувати (для Паузи)")
         info_label.setStyleSheet("color: #aaa; font-style: italic; margin-bottom: 5px;")
         self.layout.addWidget(info_label)
@@ -136,13 +126,11 @@ class LevelSequenceDialog(QDialog):
         self.buttons.accepted.connect(self.save_sequence)
         self.buttons.rejected.connect(self.reject)
         self.layout.addWidget(self.buttons)
-        
         self.load_maps()
 
     def load_maps(self):
         map_files = [f for f in os.listdir('data/maps') if f.endswith('.json')]
         map_data_list = []
-        
         for f_name in map_files:
             path = f'data/maps/{f_name}'
             try:
@@ -152,9 +140,7 @@ class LevelSequenceDialog(QDialog):
                     ignore = data.get('ignore_in_progression', False)
                     map_data_list.append((order, f_name, ignore))
             except: pass
-            
         map_data_list.sort(key=lambda x: x[0])
-        
         for order, f_name, ignore in map_data_list:
             item = QListWidgetItem(f_name)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsDragEnabled)
@@ -166,18 +152,13 @@ class LevelSequenceDialog(QDialog):
             item = self.list_widget.item(i)
             f_name = item.text()
             ignore = (item.checkState() == Qt.Unchecked) 
-            
             path = f'data/maps/{f_name}'
             if os.path.exists(path):
                 try:
-                    with open(path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        
+                    with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
                     data['level_order'] = i
                     data['ignore_in_progression'] = ignore
-                    
-                    with open(path, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, ensure_ascii=False, indent=4)
+                    with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
                 except: pass
         self.accept()
 
@@ -218,14 +199,12 @@ class MainWindow(QMainWindow):
             shutil.move('map.json', 'data/maps/0.json')
             
         self.update_map_list()
-        
         current_map = self.map_combo.currentText()
-        if current_map:
-            self.on_map_changed(current_map)
+        if current_map: self.on_map_changed(current_map)
 
         self.map_combo.currentTextChanged.connect(self.on_map_changed)
         self.btn_new_map.clicked.connect(self.on_new_map_clicked)
-        self.btn_delete_map.clicked.connect(self.on_delete_map_clicked) # Підключення нової кнопки
+        self.btn_delete_map.clicked.connect(self.on_delete_map_clicked) 
         self.btn_save.clicked.connect(self.on_save_clicked)
         self.btn_play.clicked.connect(self.on_play_clicked)
         self.tree_view.clicked.connect(self.on_folder_clicked)
@@ -252,13 +231,10 @@ class MainWindow(QMainWindow):
                   self.prop_sfx_hit_input, self.prop_sfx_jump_input, 
                   self.prop_sfx_dash_input, self.prop_sfx_shoot_input,
                   self.prop_anim_die_input] 
-        if hasattr(self, 'prop_dialogue_input'):
-            inputs.append(self.prop_dialogue_input)
-        if hasattr(self, 'prop_dialogue_sound_input'):
-            inputs.append(self.prop_dialogue_sound_input)
+        if hasattr(self, 'prop_dialogue_input'): inputs.append(self.prop_dialogue_input)
+        if hasattr(self, 'prop_dialogue_sound_input'): inputs.append(self.prop_dialogue_sound_input)
             
-        for input_field in inputs:
-            input_field.textChanged.connect(self.save_folder_properties)
+        for input_field in inputs: input_field.textChanged.connect(self.save_folder_properties)
         
         for w in [self.prop_type_combo, self.prop_preset_combo, self.prop_collision_cb, self.prop_visible_cb, 
                   self.prop_walk_cb, self.prop_shoot_cb, self.prop_jump_cb, self.prop_wall_jump_cb, self.prop_dash_cb,
@@ -272,13 +248,15 @@ class MainWindow(QMainWindow):
             self.prop_ui_action_combo.currentIndexChanged.connect(self.save_folder_properties)
             if isinstance(self.prop_ui_target_input, QComboBox):
                 self.prop_ui_target_input.currentTextChanged.connect(self.save_folder_properties)
+        
+        if hasattr(self, 'prop_col_type_combo'):
+            self.prop_col_type_combo.currentIndexChanged.connect(self.save_folder_properties)
+            self.prop_col_value_input.valueChanged.connect(self.save_folder_properties)
 
     def on_build_game_clicked(self):
         self.on_save_clicked() 
         game_name, ok = QInputDialog.getText(self, "Build Game", "Як назвати гру? (тільки англійські літери):", text="MyAwesomeGame")
-        if not ok or not game_name:
-            return
-            
+        if not ok or not game_name: return
         dest_dir = QFileDialog.getExistingDirectory(self, "Виберіть папку, куди зберегти готову гру")
         if dest_dir:
             dialog = BuildDialog(dest_dir, game_name, self)
@@ -288,9 +266,7 @@ class MainWindow(QMainWindow):
     def open_level_sequence(self):
         self.on_save_clicked()
         dialog = LevelSequenceDialog(self)
-        if dialog.exec():
-            self.update_map_list()
-            print("Порядок рівнів успішно оновлено!")
+        if dialog.exec(): self.update_map_list()
             
     def on_editor_mode_toggled(self, checked):
         if checked:
@@ -305,10 +281,8 @@ class MainWindow(QMainWindow):
             self.prop_title.setText("Properties")
             
         self.update_map_list()
-        
         current_map = self.map_combo.currentText()
-        if current_map:
-            self.on_map_changed(current_map)
+        if current_map: self.on_map_changed(current_map)
 
     def closeEvent(self, event):
         self.on_save_clicked()
@@ -317,34 +291,25 @@ class MainWindow(QMainWindow):
     def update_map_list(self):
         self.map_combo.blockSignals(True)
         self.map_combo.clear()
-        
         is_menu_mode = self.btn_toggle_editor.isChecked()
         valid_maps = []
-        
         map_files = sorted([f for f in os.listdir('data/maps') if f.endswith('.json')])
-        
         for f_name in map_files:
             path = f'data/maps/{f_name}'
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     is_menu_file = data.get('is_menu', False)
-                    
-                    if is_menu_mode and is_menu_file:
-                        valid_maps.append(f_name)
-                    elif not is_menu_mode and not is_menu_file:
-                        valid_maps.append(f_name)
-            except:
-                pass
+                    if is_menu_mode and is_menu_file: valid_maps.append(f_name)
+                    elif not is_menu_mode and not is_menu_file: valid_maps.append(f_name)
+            except: pass
                 
         if not valid_maps:
             default_name = "main_menu.json" if is_menu_mode else "0.json"
             path = f'data/maps/{default_name}'
             with open(path, 'w') as f:
-                if is_menu_mode:
-                    json.dump({'is_menu': True, 'ui_elements': [], 'ignore_in_progression': True}, f)
-                else:
-                    json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': [], 'level_order': 999, 'ignore_in_progression': False}, f)
+                if is_menu_mode: json.dump({'is_menu': True, 'ui_elements': [], 'ignore_in_progression': True}, f)
+                else: json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': [], 'level_order': 999, 'ignore_in_progression': False}, f)
             valid_maps = [default_name]
             
         self.map_combo.addItems(valid_maps)
@@ -362,13 +327,10 @@ class MainWindow(QMainWindow):
         if map_name:
             path = f'data/maps/{map_name}'
             try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                
+                with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
                 if data.get('is_menu', False):
                     self.viewport.set_mode("MENU_EDITOR")
                     self.viewport.menu_editor.load(path)
-                    
                     bg_path = getattr(self.viewport.menu_editor, 'bg_path', None)
                     if hasattr(self, 'prop_current_bg_label'):
                         self.prop_current_bg_label.setText(f"Active BG: {bg_path if bg_path else 'None'}")
@@ -376,66 +338,42 @@ class MainWindow(QMainWindow):
                 else:
                     self.viewport.set_mode("EDITOR")
                     self.viewport.editor.tilemap.load(path)
-                    
                     bg_path = getattr(self.viewport.editor.tilemap, 'bg_path', None)
                     bg_music = getattr(self.viewport.editor.tilemap, 'bg_music', None)
                     if hasattr(self, 'prop_current_bg_label'):
                         self.prop_current_bg_label.setText(f"Active BG: {bg_path if bg_path else 'None'}")
                         self.prop_current_music_label.setText(f"Active Music: {bg_music if bg_music else 'None'}")
-            except Exception as e:
-                print(f"Error loading map: {e}")
+            except Exception as e: print(f"Error loading map: {e}")
 
     def on_new_map_clicked(self):
         name, ok = QInputDialog.getText(self, "New Map", "Map name (e.g., '1' or 'main_menu'):")
         if ok and name:
             file_name = f"{name}.json"
-            if not file_name.endswith('.json'):
-                file_name += ".json"
-                
+            if not file_name.endswith('.json'): file_name += ".json"
             path = os.path.join('data/maps', file_name)
             if not os.path.exists(path):
                 if self.btn_toggle_editor.isChecked():
-                    with open(path, 'w') as f:
-                        json.dump({'is_menu': True, 'ui_elements': [], 'ignore_in_progression': True}, f)
+                    with open(path, 'w') as f: json.dump({'is_menu': True, 'ui_elements': [], 'ignore_in_progression': True}, f)
                 else:
-                    with open(path, 'w') as f:
-                        json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': [], 'level_order': 999, 'ignore_in_progression': False}, f)
-                        
+                    with open(path, 'w') as f: json.dump({'tilemap': {}, 'tile_size': 16, 'offgrid': [], 'level_order': 999, 'ignore_in_progression': False}, f)
                 self.update_map_list()
                 self.map_combo.setCurrentText(file_name)
-            else:
-                QMessageBox.warning(self, "Error", "Map already exists!")
+            else: QMessageBox.warning(self, "Error", "Map already exists!")
                 
-    # --- НОВА ФУНКЦІЯ: Видалення мапи ---
     def on_delete_map_clicked(self):
         current_map = self.map_combo.currentText()
-        if not current_map:
-            return
-            
-        reply = QMessageBox.question(self, 'Delete Map', 
-                                     f"Are you sure you want to permanently delete '{current_map}'?",
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                                     
+        if not current_map: return
+        reply = QMessageBox.question(self, 'Delete Map', f"Are you sure you want to permanently delete '{current_map}'?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             path = os.path.join('data/maps', current_map)
             try:
-                if os.path.exists(path):
-                    os.remove(path)
-                    print(f"Мапа {current_map} успішно видалена.")
-                    
-                # Оновлюємо список мап
+                if os.path.exists(path): os.remove(path)
                 self.update_map_list()
-                
-                # Завантажуємо першу-ліпшу доступну мапу, якщо така є
                 if self.map_combo.count() > 0:
                     self.map_combo.setCurrentIndex(0)
                     self.on_map_changed(self.map_combo.currentText())
-                else:
-                    # Якщо це була остання мапа, рушій сам створить нову порожню (через update_map_list)
-                    self.on_map_changed(self.map_combo.currentText())
-                    
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Could not delete map: {e}")
+                else: self.on_map_changed(self.map_combo.currentText())
+            except Exception as e: QMessageBox.critical(self, "Error", f"Could not delete map: {e}")
                 
     def get_path_parts(self, index):
         parts = []
@@ -456,30 +394,21 @@ class MainWindow(QMainWindow):
         self.prop_block_container.setVisible(is_block)
         self.prop_spawner_container.setVisible(is_spawner)
         self.prop_bg_container.setVisible(is_bg)
+        if hasattr(self, 'prop_ui_btn_container'): self.prop_ui_btn_container.setVisible(is_ui_btn)
         
-        if hasattr(self, 'prop_ui_btn_container'):
-            self.prop_ui_btn_container.setVisible(is_ui_btn)
+        if is_killzone or is_spawner or is_bg or is_ui_btn: self.prop_collision_cb.setChecked(False)
+        if is_killzone or is_bg or is_ui_btn: self.prop_collision_cb.setVisible(False)
+        else: self.prop_collision_cb.setVisible(True)
             
-        if hasattr(self, 'sfx_container'):
-            if not is_spawner:
+        if is_spawner: self.toggle_spawner_features()
+        else:
+            if hasattr(self, 'sfx_container'):
                 self.sfx_container.setVisible(False)
                 self.sfx_divider.setVisible(False)
                 self.sfx_title_label.setVisible(False)
-        
-        if is_killzone or is_spawner or is_bg or is_ui_btn:
-            self.prop_collision_cb.setChecked(False)
-            
-        if is_killzone or is_bg or is_ui_btn:
-            self.prop_collision_cb.setVisible(False)
-        else:
-            self.prop_collision_cb.setVisible(True)
-            
-        if is_spawner:
-            self.toggle_spawner_features()
     
     def clear_background(self):
-        if self.viewport.mode == "MENU_EDITOR":
-            self.viewport.menu_editor.bg_path = None
+        if self.viewport.mode == "MENU_EDITOR": self.viewport.menu_editor.bg_path = None
         else:
             self.viewport.editor.tilemap.bg_path = None
             self.viewport.editor.tilemap.bg_music = None
@@ -491,10 +420,14 @@ class MainWindow(QMainWindow):
         is_player = (preset == "Player")
         is_enemy = (preset == "Enemy")
         is_npc = (preset == "Friendly NPC")
-        is_entity = is_player or is_enemy or is_npc
+        is_collectible = (preset == "Collectible") # ФІКС: Змінна для монет
+        is_entity = is_player or is_enemy or is_npc or is_collectible
         
-        self.prop_walk_cb.setVisible(True)
-        is_walking = self.prop_walk_cb.isChecked()
+        self.prop_anim_idle_label.setVisible(is_entity)
+        self.prop_anim_idle_input.setVisible(is_entity)
+
+        self.prop_walk_cb.setVisible(not is_collectible)
+        is_walking = self.prop_walk_cb.isChecked() and not is_collectible
         self.prop_speed_label.setVisible(is_walking)
         self.prop_speed_input.setVisible(is_walking)
         self.prop_anim_walk_label.setVisible(is_walking)
@@ -529,6 +462,8 @@ class MainWindow(QMainWindow):
         
         self.prop_vision_label.setVisible(is_enemy)
         self.prop_vision_input.setVisible(is_enemy)
+        self.prop_anim_die_label.setVisible(not is_collectible)
+        self.prop_anim_die_input.setVisible(not is_collectible)
         
         if hasattr(self, 'prop_dialogue_input'):
             self.prop_dialogue_label.setVisible(is_npc)
@@ -536,20 +471,34 @@ class MainWindow(QMainWindow):
             self.prop_dialogue_sound_label.setVisible(is_npc)
             self.prop_dialogue_sound_input.setVisible(is_npc)
             
+        if hasattr(self, 'prop_col_type_combo'):
+            self.prop_col_type_label.setVisible(is_collectible)
+            self.prop_col_type_combo.setVisible(is_collectible)
+            self.prop_col_value_label.setVisible(is_collectible)
+            self.prop_col_value_input.setVisible(is_collectible)
+            
         if hasattr(self, 'sfx_container'):
             is_spawner = (self.prop_type_combo.currentText() == "Spawner")
-            self.sfx_container.setVisible(is_spawner and not is_npc)
-            self.sfx_divider.setVisible(is_spawner and not is_npc)
-            self.sfx_title_label.setVisible(is_spawner and not is_npc)
-        
-        self.prop_anim_die_label.setVisible(is_entity)
-        self.prop_anim_die_input.setVisible(is_entity)
+            show_sfx = is_spawner and not is_npc
+            self.sfx_container.setVisible(show_sfx)
+            self.sfx_divider.setVisible(show_sfx)
+            self.sfx_title_label.setVisible(show_sfx)
+            
+            if is_collectible:
+                self.row_sfx_jump.setVisible(False)
+                self.row_sfx_dash.setVisible(False)
+                self.row_sfx_shoot.setVisible(False)
+                self.row_sfx_hit.findChildren(QLabel)[0].setText("Pickup Sound:")
+            else:
+                self.row_sfx_jump.setVisible(True)
+                self.row_sfx_dash.setVisible(True)
+                self.row_sfx_shoot.setVisible(True)
+                if hasattr(self, 'row_sfx_hit'):
+                    self.row_sfx_hit.findChildren(QLabel)[0].setText("Hit Sound File:")
 
     def reset_folder_properties(self):
         if not self.current_selected_folder: return
-        reply = QMessageBox.question(self, 'Reset Properties', 
-                                     f"Reset '{self.current_selected_folder}' to a default solid block?",
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        reply = QMessageBox.question(self, 'Reset Properties', f"Reset '{self.current_selected_folder}' to a default solid block?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             widgets = [self.prop_type_combo, self.prop_preset_combo, self.prop_collision_cb, self.prop_visible_cb,
                       self.prop_walk_cb, self.prop_shoot_cb, self.prop_jump_cb, self.prop_wall_jump_cb, self.prop_dash_cb,
@@ -560,8 +509,8 @@ class MainWindow(QMainWindow):
                       self.prop_sfx_hit_input, self.prop_sfx_jump_input, 
                       self.prop_sfx_dash_input, self.prop_sfx_shoot_input,
                       self.prop_anim_die_input]
-            if hasattr(self, 'prop_dialogue_input'): widgets.append(self.prop_dialogue_input)
-            if hasattr(self, 'prop_dialogue_sound_input'): widgets.append(self.prop_dialogue_sound_input)
+            if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
+            if hasattr(self, 'prop_col_type_combo'): widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
             for w in widgets: w.blockSignals(True)
             
             self.prop_type_combo.setCurrentText("Static Blocks")
@@ -578,8 +527,12 @@ class MainWindow(QMainWindow):
             self.prop_sfx_jump_input.setText("jump.wav")
             self.prop_sfx_dash_input.setText("dash.wav")
             self.prop_sfx_shoot_input.setText("shoot.wav")
-            if hasattr(self, 'prop_dialogue_input'): self.prop_dialogue_input.setText("Привіт!;Як справи?")
-            if hasattr(self, 'prop_dialogue_sound_input'): self.prop_dialogue_sound_input.setText("talk.wav")
+            if hasattr(self, 'prop_dialogue_input'): 
+                self.prop_dialogue_input.setText("Привіт!;Як справи?")
+                self.prop_dialogue_sound_input.setText("talk.wav")
+            if hasattr(self, 'prop_col_type_combo'):
+                self.prop_col_type_combo.setCurrentText("coin")
+                self.prop_col_value_input.setValue(1)
             self.prop_collision_cb.setChecked(True)
             self.prop_visible_cb.setChecked(True)
             self.prop_walk_cb.setChecked(False)
@@ -624,12 +577,9 @@ class MainWindow(QMainWindow):
                   self.prop_sfx_dash_slider, self.prop_sfx_shoot_slider,
                   self.prop_anim_die_input]
         
-        if hasattr(self, 'prop_ui_text_input'):
-            widgets.extend([self.prop_ui_text_input, self.prop_ui_action_combo, self.prop_ui_target_input])
-        if hasattr(self, 'prop_dialogue_input'):
-            widgets.append(self.prop_dialogue_input)
-        if hasattr(self, 'prop_dialogue_sound_input'):
-            widgets.append(self.prop_dialogue_sound_input)
+        if hasattr(self, 'prop_ui_text_input'): widgets.extend([self.prop_ui_text_input, self.prop_ui_action_combo, self.prop_ui_target_input])
+        if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
+        if hasattr(self, 'prop_col_type_combo'): widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
             
         for w in widgets: w.blockSignals(True)
         
@@ -644,10 +594,8 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'prop_ui_text_input'):
                     self.prop_ui_text_input.setText(data.get('ui_text', 'Button'))
                     self.prop_ui_action_combo.setCurrentText(data.get('ui_action', 'load_map'))
-                    if isinstance(self.prop_ui_target_input, QComboBox):
-                        self.prop_ui_target_input.setCurrentText(data.get('ui_target', '1.json'))
-                    else:
-                        self.prop_ui_target_input.setText(data.get('ui_target', '1.json'))
+                    if isinstance(self.prop_ui_target_input, QComboBox): self.prop_ui_target_input.setCurrentText(data.get('ui_target', '1.json'))
+                    else: self.prop_ui_target_input.setText(data.get('ui_target', '1.json'))
                 
                 self.prop_anim_idle_input.setText(data.get('anim_idle', 'enemy/idle'))
                 self.prop_anim_walk_input.setText(data.get('anim_walk', 'enemy/run'))
@@ -657,19 +605,21 @@ class MainWindow(QMainWindow):
                 self.prop_anim_die_input.setText(data.get('anim_die', 'particle/particle'))
                 self.prop_weapon_img_input.setText(data.get('weapon_img', 'gun.png'))
                 self.prop_projectile_img_input.setText(data.get('projectile_img', 'projectile.png'))
-                if hasattr(self, 'prop_dialogue_input'): self.prop_dialogue_input.setText(data.get('dialogue_text', 'Привіт!;Як справи?'))
-                if hasattr(self, 'prop_dialogue_sound_input'): self.prop_dialogue_sound_input.setText(data.get('dialogue_sound', 'talk.wav'))
+                if hasattr(self, 'prop_dialogue_input'): 
+                    self.prop_dialogue_input.setText(data.get('dialogue_text', 'Привіт!;Як справи?'))
+                    self.prop_dialogue_sound_input.setText(data.get('dialogue_sound', 'talk.wav'))
+                if hasattr(self, 'prop_col_type_combo'):
+                    self.prop_col_type_combo.setCurrentText(data.get('col_type', 'coin'))
+                    self.prop_col_value_input.setValue(data.get('col_value', 1))
                 
                 sfx_hit = data.get('sfx_hit', 'hit.wav')
                 sfx_jump = data.get('sfx_jump', 'jump.wav')
                 sfx_dash = data.get('sfx_dash', 'dash.wav')
                 sfx_shoot = data.get('sfx_shoot', 'shoot.wav')
-                
                 self.prop_sfx_hit_input.setText(sfx_hit)
                 self.prop_sfx_jump_input.setText(sfx_jump)
                 self.prop_sfx_dash_input.setText(sfx_dash)
                 self.prop_sfx_shoot_input.setText(sfx_shoot)
-                
                 vols = data.get('sfx_volumes', {})
                 self.prop_sfx_hit_slider.setValue(vols.get(sfx_hit, 60))
                 self.prop_sfx_jump_slider.setValue(vols.get(sfx_jump, 60))
@@ -678,7 +628,6 @@ class MainWindow(QMainWindow):
                 
                 default_col = False if obj_type in ["Kill Zone", "Spawner", "Background", "Level Exit", "UI Button"] else True
                 self.prop_collision_cb.setChecked(data.get('collision', default_col))
-                
                 self.prop_visible_cb.setChecked(data.get('is_visible', True))
                 self.prop_walk_cb.setChecked(data.get('can_walk', False))
                 self.prop_shoot_cb.setChecked(data.get('can_shoot', False))
@@ -704,8 +653,12 @@ class MainWindow(QMainWindow):
             self.prop_sfx_jump_input.setText("jump.wav")
             self.prop_sfx_dash_input.setText("dash.wav")
             self.prop_sfx_shoot_input.setText("shoot.wav")
-            if hasattr(self, 'prop_dialogue_input'): self.prop_dialogue_input.setText("Привіт!;Як справи?")
-            if hasattr(self, 'prop_dialogue_sound_input'): self.prop_dialogue_sound_input.setText("talk.wav")
+            if hasattr(self, 'prop_dialogue_input'): 
+                self.prop_dialogue_input.setText("Привіт!;Як справи?")
+                self.prop_dialogue_sound_input.setText("talk.wav")
+            if hasattr(self, 'prop_col_type_combo'):
+                self.prop_col_type_combo.setCurrentText("coin")
+                self.prop_col_value_input.setValue(1)
             self.prop_sfx_hit_slider.setValue(60)
             self.prop_sfx_jump_slider.setValue(60)
             self.prop_sfx_dash_slider.setValue(60)
@@ -733,16 +686,13 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'prop_ui_text_input'):
                     el['text'] = self.prop_ui_text_input.text()
                     el['action'] = self.prop_ui_action_combo.currentText()
-                    if isinstance(self.prop_ui_target_input, QComboBox):
-                        el['target'] = self.prop_ui_target_input.currentText()
-                    else:
-                        el['target'] = self.prop_ui_target_input.text()
+                    if isinstance(self.prop_ui_target_input, QComboBox): el['target'] = self.prop_ui_target_input.currentText()
+                    else: el['target'] = self.prop_ui_target_input.text()
             return
         
         if not self.current_selected_folder: return
         folder_dir = os.path.join('data', 'images', 'tiles', self.current_selected_folder)
         if not os.path.exists(folder_dir): return
-            
         path = os.path.join(folder_dir, 'properties.json')
         
         volumes = {}
@@ -756,10 +706,8 @@ class MainWindow(QMainWindow):
             
         target_val = '1.json'
         if hasattr(self, 'prop_ui_target_input'):
-            if isinstance(self.prop_ui_target_input, QComboBox):
-                target_val = self.prop_ui_target_input.currentText()
-            else:
-                target_val = self.prop_ui_target_input.text()
+            if isinstance(self.prop_ui_target_input, QComboBox): target_val = self.prop_ui_target_input.currentText()
+            else: target_val = self.prop_ui_target_input.text()
         
         data = {
             'type': self.prop_type_combo.currentText(),
@@ -774,16 +722,16 @@ class MainWindow(QMainWindow):
             'projectile_img': self.prop_projectile_img_input.text(),
             'dialogue_text': self.prop_dialogue_input.text() if hasattr(self, 'prop_dialogue_input') else 'Привіт!;Як справи?',
             'dialogue_sound': self.prop_dialogue_sound_input.text() if hasattr(self, 'prop_dialogue_sound_input') else 'talk.wav',
+            'col_type': self.prop_col_type_combo.currentText() if hasattr(self, 'prop_col_type_combo') else 'coin',
+            'col_value': self.prop_col_value_input.value() if hasattr(self, 'prop_col_value_input') else 1,
             'sfx_hit': self.prop_sfx_hit_input.text() if hasattr(self, 'prop_sfx_hit_input') else 'hit.wav',
             'sfx_jump': self.prop_sfx_jump_input.text() if hasattr(self, 'prop_sfx_jump_input') else 'jump.wav',
             'sfx_dash': self.prop_sfx_dash_input.text() if hasattr(self, 'prop_sfx_dash_input') else 'dash.wav',
             'sfx_shoot': self.prop_sfx_shoot_input.text() if hasattr(self, 'prop_sfx_shoot_input') else 'shoot.wav',
             'sfx_volumes': volumes,
-            
             'ui_text': self.prop_ui_text_input.text() if hasattr(self, 'prop_ui_text_input') else 'Button',
             'ui_action': self.prop_ui_action_combo.currentText() if hasattr(self, 'prop_ui_action_combo') else 'load_map',
             'ui_target': target_val,
-            
             'collision': False if self.prop_type_combo.currentText() in ["Kill Zone", "Spawner", "Background", "Level Exit", "UI Button"] else self.prop_collision_cb.isChecked(),
             'is_visible': self.prop_visible_cb.isChecked(), 
             'can_walk': self.prop_walk_cb.isChecked(),
@@ -798,35 +746,25 @@ class MainWindow(QMainWindow):
         }
         try:
             with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
-        except FileNotFoundError:
-            pass
+        except FileNotFoundError: pass
     
     def on_ui_element_selected(self):
         sel_idx = getattr(self.viewport.menu_editor, 'selected_index', None)
-        
         if sel_idx is not None and sel_idx < len(self.viewport.menu_editor.ui_elements):
             el = self.viewport.menu_editor.ui_elements[sel_idx]
-            
             self.properties_panel.show()
             self.prop_title.setText(f"Properties: Selected Button")
-            
             if hasattr(self, 'prop_ui_text_input'):
                 self.prop_ui_text_input.blockSignals(True)
                 self.prop_ui_action_combo.blockSignals(True)
                 self.prop_ui_target_input.blockSignals(True)
-                
                 self.prop_ui_text_input.setText(el.get('text', 'Button'))
                 self.prop_ui_action_combo.setCurrentText(el.get('action', 'load_map'))
-                
-                if isinstance(self.prop_ui_target_input, QComboBox):
-                    self.prop_ui_target_input.setCurrentText(el.get('target', '1.json'))
-                else:
-                    self.prop_ui_target_input.setText(el.get('target', '1.json'))
-                
+                if isinstance(self.prop_ui_target_input, QComboBox): self.prop_ui_target_input.setCurrentText(el.get('target', '1.json'))
+                else: self.prop_ui_target_input.setText(el.get('target', '1.json'))
                 self.prop_ui_text_input.blockSignals(False)
                 self.prop_ui_action_combo.blockSignals(False)
                 self.prop_ui_target_input.blockSignals(False)
-            
             self.prop_type_combo.blockSignals(True)
             self.prop_type_combo.setCurrentText("UI Button")
             self.prop_type_combo.blockSignals(False)
@@ -838,10 +776,8 @@ class MainWindow(QMainWindow):
     def on_folder_clicked(self, index):
         parts = self.get_path_parts(index)
         self.asset_list.clear()
-        
         self.btn_add_audio.hide() 
         self.btn_add_tiles.hide()
-        
         if parts[0] == "Tiles":
             self.browser_scroll.show() 
             if len(parts) == 2:
@@ -858,7 +794,6 @@ class MainWindow(QMainWindow):
             else:
                 self.properties_panel.hide()
                 self.current_selected_folder = None
-                
         elif parts[0] == "Entities":
             self.browser_scroll.show() 
             self.properties_panel.hide() 
@@ -874,13 +809,11 @@ class MainWindow(QMainWindow):
                         item = QListWidgetItem(QIcon(QPixmap.fromImage(qimg)), f)
                         item.setSizeHint(QSize(80, 90))
                         self.asset_list.addItem(item)
-
         elif parts[0] == "Audio":
             self.browser_scroll.hide() 
             self.properties_panel.hide()
             self.current_selected_folder = None
-            if len(parts) == 1: 
-                self.btn_add_audio.show()
+            if len(parts) == 1: self.btn_add_audio.show()
             elif len(parts) == 2: 
                 if self.prop_type_combo.currentText() == "Background":
                     self.viewport.editor.tilemap.bg_music = parts[1]
@@ -892,30 +825,21 @@ class MainWindow(QMainWindow):
         if parts and parts[0] == "Tiles" and len(parts) == 2:
             if self.prop_type_combo.currentText() == "Background":
                 bg_str = f"{parts[1]}/{index.row()}"
-                
-                if self.viewport.mode == "MENU_EDITOR":
-                    self.viewport.menu_editor.bg_path = bg_str
-                else:
-                    self.viewport.editor.tilemap.bg_path = bg_str
-                    
-                if hasattr(self, 'prop_current_bg_label'):
-                    self.prop_current_bg_label.setText(f"Active BG: {parts[1]} (Image {index.row()})")
+                if self.viewport.mode == "MENU_EDITOR": self.viewport.menu_editor.bg_path = bg_str
+                else: self.viewport.editor.tilemap.bg_path = bg_str
+                if hasattr(self, 'prop_current_bg_label'): self.prop_current_bg_label.setText(f"Active BG: {parts[1]} (Image {index.row()})")
                 self.viewport.set_current_tile(None, 0)
-            else:
-                self.viewport.set_current_tile(parts[1], index.row())
-        else:
-            self.viewport.set_current_tile(None, 0)
+            else: self.viewport.set_current_tile(parts[1], index.row())
+        else: self.viewport.set_current_tile(None, 0)
 
     def on_save_clicked(self):
         map_name = self.map_combo.currentText()
         if map_name:
             path = f'data/maps/{map_name}'
-            
             existing_data = {}
             if os.path.exists(path):
                 try:
-                    with open(path, 'r', encoding='utf-8') as f:
-                        existing_data = json.load(f)
+                    with open(path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
                 except: pass
                 
             if self.viewport.mode == "MENU_EDITOR":
@@ -927,84 +851,59 @@ class MainWindow(QMainWindow):
                 
             if os.path.exists(path):
                 try:
-                    with open(path, 'r', encoding='utf-8') as f:
-                        new_data = json.load(f)
-                        
-                    if 'level_order' in existing_data:
-                        new_data['level_order'] = existing_data['level_order']
-                    if 'ignore_in_progression' in existing_data:
-                        new_data['ignore_in_progression'] = existing_data['ignore_in_progression']
-                        
-                    with open(path, 'w', encoding='utf-8') as f:
-                        json.dump(new_data, f, ensure_ascii=False, indent=4)
+                    with open(path, 'r', encoding='utf-8') as f: new_data = json.load(f)
+                    if 'level_order' in existing_data: new_data['level_order'] = existing_data['level_order']
+                    if 'ignore_in_progression' in existing_data: new_data['ignore_in_progression'] = existing_data['ignore_in_progression']
+                    with open(path, 'w', encoding='utf-8') as f: json.dump(new_data, f, ensure_ascii=False, indent=4)
                 except: pass
 
     def on_play_clicked(self):
         if self.btn_play.text() == "▶ PLAY":
             self.on_save_clicked() 
-            with open('data/maps/current_play.txt', 'w') as f:
-                f.write(self.map_combo.currentText())
-                
+            with open('data/maps/current_play.txt', 'w') as f: f.write(self.map_combo.currentText())
             self.btn_play.setText("■ STOP")
             self.btn_play.setStyleSheet("background-color: #d73a49; color: white; font-weight: bold;")
-            
             self.sidebar_panel.hide()
             self.browser_scroll.hide() 
             self.properties_panel.hide()
-            
             QApplication.processEvents() 
             self.viewport.set_mode("PLAY")
             self.viewport.setFocus()
         else:
             self.btn_play.setText("▶ PLAY")
             self.btn_play.setStyleSheet("")
-            
             try:
                 pygame.mixer.music.stop()
                 pygame.mixer.stop()
-            except Exception:
-                pass
-                
+            except Exception: pass
             self.sidebar_panel.show()
-            
             current_index = self.tree_view.currentIndex()
             if current_index.isValid():
                 parts = self.get_path_parts(current_index)
-                if parts[0] != "Audio":
-                    self.browser_scroll.show()
-            else:
-                self.browser_scroll.show()
+                if parts[0] != "Audio": self.browser_scroll.show()
+            else: self.browser_scroll.show()
 
-            if getattr(self, 'current_selected_folder', None): 
-                self.properties_panel.show() 
-                
-            if self.btn_toggle_editor.isChecked():
-                self.viewport.set_mode("MENU_EDITOR")
-            else:
-                self.viewport.set_mode("EDITOR")
+            if getattr(self, 'current_selected_folder', None): self.properties_panel.show() 
+            if self.btn_toggle_editor.isChecked(): self.viewport.set_mode("MENU_EDITOR")
+            else: self.viewport.set_mode("EDITOR")
     
     def on_new_folder_clicked(self):
         index = self.tree_view.currentIndex()
         if not index.isValid():
             QMessageBox.warning(self, "Error", "Select 'Tiles' or 'Entities' to create a folder there.")
             return
-            
         parts = self.get_path_parts(index)
         root = parts[0]
         if root == "Audio": return
-        
         folder_name, ok = QInputDialog.getText(self, "New Folder", "Name:")
         if not ok or not folder_name: return
-            
         if root == "Tiles":
             path = os.path.join('data', 'images', 'tiles', folder_name)
             if not os.path.exists(path):
                 os.makedirs(path) 
                 self.assets[folder_name] = [] 
                 self.root_tiles.appendRow(create_item(folder_name))
-            else:
-                QMessageBox.warning(self, "Error", "Folder already exists!")
-                
+            else: QMessageBox.warning(self, "Error", "Folder already exists!")
         elif root == "Entities":
             if len(parts) <= 2: 
                 path = os.path.join('data', 'images', 'entities', folder_name)
@@ -1012,62 +911,45 @@ class MainWindow(QMainWindow):
                     os.makedirs(path)
                     os.makedirs(os.path.join(path, 'idle'))
                     os.makedirs(os.path.join(path, 'run'))
-                    
                     ent_item = create_item(folder_name)
                     ent_item.appendRow(create_item("idle"))
                     ent_item.appendRow(create_item("run"))
                     self.root_entities.appendRow(ent_item)
-                else:
-                    QMessageBox.warning(self, "Error", "Entity already exists!")
+                else: QMessageBox.warning(self, "Error", "Entity already exists!")
             elif len(parts) == 3: 
                 path = os.path.join('data', 'images', 'entities', parts[1], folder_name)
                 if not os.path.exists(path):
                     os.makedirs(path)
                     item = self.tree_model.itemFromIndex(index).parent()
                     item.appendRow(create_item(folder_name))
-                else:
-                    QMessageBox.warning(self, "Error", "Animation already exists!")
+                else: QMessageBox.warning(self, "Error", "Animation already exists!")
 
     def on_add_tiles_clicked(self):
         index = self.tree_view.currentIndex()
         parts = self.get_path_parts(index)
         if not parts: return
-        
         target_dir = ""
-        if parts[0] == "Tiles" and len(parts) == 2:
-            target_dir = os.path.join('data', 'images', 'tiles', parts[1])
-        elif parts[0] == "Entities" and len(parts) == 3:
-            target_dir = os.path.join('data', 'images', 'entities', parts[1], parts[2])
-        else:
-            return
-            
+        if parts[0] == "Tiles" and len(parts) == 2: target_dir = os.path.join('data', 'images', 'tiles', parts[1])
+        elif parts[0] == "Entities" and len(parts) == 3: target_dir = os.path.join('data', 'images', 'entities', parts[1], parts[2])
+        else: return
         files, _ = QFileDialog.getOpenFileNames(self, "Select Images", "", "Images (*.png)")
         if files:
             old_files = sorted([f for f in os.listdir(target_dir) if f.lower().endswith(valid_extensions)]) if os.path.exists(target_dir) else []
-            for file_path in files:
-                shutil.copy(file_path, os.path.join(target_dir, os.path.basename(file_path)))
-            
+            for file_path in files: shutil.copy(file_path, os.path.join(target_dir, os.path.basename(file_path)))
             if parts[0] == "Tiles":
                 new_files = sorted([f for f in os.listdir(target_dir) if f.lower().endswith(valid_extensions)])
                 mapping = {}
                 for i, old_file in enumerate(old_files):
-                    if old_file in new_files:
-                        mapping[i] = new_files.index(old_file)
-                        
+                    if old_file in new_files: mapping[i] = new_files.index(old_file)
                 editor_tilemap = self.viewport.editor.tilemap
                 folder_name = parts[1]
                 for loc, t in editor_tilemap.tilemap.items():
-                    if t['type'] == folder_name and t['variant'] in mapping:
-                        t['variant'] = mapping[t['variant']]
+                    if t['type'] == folder_name and t['variant'] in mapping: t['variant'] = mapping[t['variant']]
                 for t in editor_tilemap.offgrid_tiles:
-                    if t['type'] == folder_name and t['variant'] in mapping:
-                        t['variant'] = mapping[t['variant']]
-                        
+                    if t['type'] == folder_name and t['variant'] in mapping: t['variant'] = mapping[t['variant']]
                 if self.viewport.current_tile_group == folder_name and self.viewport.current_tile_variant in mapping:
                     self.viewport.set_current_tile(folder_name, mapping[self.viewport.current_tile_variant])
-                    
                 self.assets[folder_name] = load_images('tiles/' + folder_name)
-                
             self.on_folder_clicked(index)
 
     def on_add_audio_clicked(self):
@@ -1078,26 +960,20 @@ class MainWindow(QMainWindow):
             for file_path in files:
                 file_name = os.path.basename(file_path)
                 shutil.copy(file_path, os.path.join(target_dir, file_name))
-                
                 existing = [self.root_audio.child(i).text() for i in range(self.root_audio.rowCount())]
-                if file_name not in existing:
-                    self.root_audio.appendRow(create_item(file_name))
+                if file_name not in existing: self.root_audio.appendRow(create_item(file_name))
 
     def show_context_menu(self, position):
         index = self.tree_view.indexAt(position)
         if not index.isValid(): return 
         parts = self.get_path_parts(index)
         if len(parts) == 1: return 
-        
         menu = QMenu()
         rename_action = menu.addAction("Rename")
         delete_action = menu.addAction("Delete")
         action = menu.exec(self.tree_view.viewport().mapToGlobal(position))
-        
-        if action == rename_action:
-            self.rename_folder(index, parts)
-        elif action == delete_action:
-            self.delete_folder(index, parts)
+        if action == rename_action: self.rename_folder(index, parts)
+        elif action == delete_action: self.delete_folder(index, parts)
 
     def rename_folder(self, index, parts):
         old_name = parts[-1]
@@ -1116,7 +992,6 @@ class MainWindow(QMainWindow):
             elif parts[0] == "Audio" and len(parts) == 2:
                 old_path = os.path.join('data', 'sfx', old_name)
                 new_path = os.path.join('data', 'sfx', new_name)
-
             if not os.path.exists(new_path):
                 try:
                     os.rename(old_path, new_path) 
@@ -1125,10 +1000,8 @@ class MainWindow(QMainWindow):
                         if getattr(self, 'current_selected_folder', None) == old_name:
                             self.load_folder_properties(new_name)
                     self.tree_model.itemFromIndex(index).setText(new_name)
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Could not rename: {e}")
-            else:
-                QMessageBox.warning(self, "Error", "File/Folder already exists!")
+                except Exception as e: QMessageBox.critical(self, "Error", f"Could not rename: {e}")
+            else: QMessageBox.warning(self, "Error", "File/Folder already exists!")
 
     def delete_folder(self, index, parts):
         folder_name = parts[-1]
@@ -1139,30 +1012,23 @@ class MainWindow(QMainWindow):
                     path = os.path.join('data', 'images', 'tiles', folder_name)
                     if os.path.exists(path): shutil.rmtree(path)
                     if folder_name in self.assets: del self.assets[folder_name]
-
                     editor_tilemap = self.viewport.editor.tilemap
                     keys_to_delete = [loc for loc, tile in editor_tilemap.tilemap.items() if tile['type'] == folder_name]
                     for loc in keys_to_delete: del editor_tilemap.tilemap[loc]
                     editor_tilemap.offgrid_tiles = [t for t in editor_tilemap.offgrid_tiles if t['type'] != folder_name]
-                    
-                    if self.viewport.current_tile_group == folder_name:
-                        self.viewport.set_current_tile(None, 0)
-                        
+                    if self.viewport.current_tile_group == folder_name: self.viewport.set_current_tile(None, 0)
                 elif parts[0] == "Entities":
                     if len(parts) == 2: path = os.path.join('data', 'images', 'entities', folder_name)
                     else: path = os.path.join('data', 'images', 'entities', parts[1], folder_name)
                     if os.path.exists(path): shutil.rmtree(path)
-                    
                 elif parts[0] == "Audio" and len(parts) == 2:
                     path = os.path.join('data', 'sfx', folder_name)
                     if os.path.exists(path): os.remove(path)
-
                 self.tree_model.itemFromIndex(index).parent().removeRow(index.row())
                 self.asset_list.clear()
                 self.btn_add_tiles.hide()
                 self.properties_panel.hide()
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Could not delete: {e}")
+            except Exception as e: QMessageBox.critical(self, "Error", f"Could not delete: {e}")
     
     def show_tile_context_menu(self, position):
         item = self.asset_list.itemAt(position)
@@ -1170,14 +1036,12 @@ class MainWindow(QMainWindow):
         menu = QMenu()
         delete_action = menu.addAction("Delete image")
         action = menu.exec(self.asset_list.viewport().mapToGlobal(position))
-        if action == delete_action:
-            self.delete_tile(item)
+        if action == delete_action: self.delete_tile(item)
 
     def delete_tile(self, item):
         row = self.asset_list.row(item) 
         index = self.tree_view.currentIndex()
         parts = self.get_path_parts(index)
-        
         reply = QMessageBox.question(self, 'Delete', "Delete this image?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             try:
@@ -1188,7 +1052,6 @@ class MainWindow(QMainWindow):
                     if row < len(files):
                         os.remove(os.path.join(folder_path, files[row]))
                         del self.assets[folder_name][row]
-                        
                         editor_tilemap = self.viewport.editor.tilemap
                         keys_to_delete = []
                         for loc, t in editor_tilemap.tilemap.items():
@@ -1196,7 +1059,6 @@ class MainWindow(QMainWindow):
                                 if t['variant'] == row: keys_to_delete.append(loc)
                                 elif t['variant'] > row: t['variant'] -= 1 
                         for loc in keys_to_delete: del editor_tilemap.tilemap[loc]
-                            
                         tiles_to_keep = []
                         for t in editor_tilemap.offgrid_tiles:
                             if t['type'] == folder_name:
@@ -1204,17 +1066,12 @@ class MainWindow(QMainWindow):
                                 elif t['variant'] > row: t['variant'] -= 1 
                             tiles_to_keep.append(t)
                         editor_tilemap.offgrid_tiles = tiles_to_keep
-                        
                         if self.viewport.current_tile_group == folder_name:
                             if self.viewport.current_tile_variant == row: self.viewport.set_current_tile(None, 0)
                             elif self.viewport.current_tile_variant > row: self.viewport.set_current_tile(folder_name, self.viewport.current_tile_variant - 1)
-                
                 elif parts[0] == "Entities":
                     folder_path = os.path.join('data', 'images', 'entities', parts[1], parts[2])
                     files = sorted([f for f in os.listdir(folder_path) if f.endswith(valid_extensions)])
-                    if row < len(files):
-                        os.remove(os.path.join(folder_path, files[row]))
-
+                    if row < len(files): os.remove(os.path.join(folder_path, files[row]))
                 self.on_folder_clicked(index)
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Could not delete: {e}")
+            except Exception as e: QMessageBox.critical(self, "Error", f"Could not delete: {e}")

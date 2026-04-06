@@ -6,7 +6,7 @@ import json
 import pygame
 
 from scripts.utils import load_image, load_images, Animation
-from scripts.entities import PhysicsEntity, Player, Enemy, NPC
+from scripts.entities import PhysicsEntity, Player, Enemy, NPC, Collectible
 from scripts.tilemap import Tilemap
 from scripts.clouds import Clouds
 from scripts.particle import Particle
@@ -24,6 +24,10 @@ class Game:
         self.dialogue_lines = []
         self.dialogue_index = 0
         self.active_npc = None
+        
+        # --- ІНВЕНТАР ТА ЗБЕРЕЖЕННЯ ---
+        self.inventory = {'coin': 0, 'key': 0}
+        self.level_start_inventory = {'coin': 0, 'key': 0} 
         
         self.ui_elements = []
         pygame.font.init()
@@ -185,6 +189,7 @@ class Game:
         self.ui_elements = []
         self.enemies = []
         self.npcs = [] 
+        self.collectibles = []
         self.projectiles = []
         self.particles = []
         self.sparks = []
@@ -288,6 +293,14 @@ class Game:
                     dialogue_text=props.get('dialogue_text', 'Привіт!;Як справи?'),
                     dialogue_sound=props.get('dialogue_sound', 'talk.wav')
                 ))
+            elif preset == "Collectible":
+                self.collectibles.append(Collectible(
+                    self, spawner['pos'], (16, 16),
+                    anim_paths=anim_paths, # <--- ФІКС ТУТ (прибрали ['idle'])
+                    c_type=props.get('col_type', 'coin'),
+                    value=props.get('col_value', 1),
+                    spawner_type=folder
+                ))
 
     def update(self, events, mpos_virtual=(0,0)):
         if self.is_menu_mode:
@@ -303,7 +316,7 @@ class Game:
             
             for event in events:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    for el in self.ui_elements:
+                    for el in reversed(self.ui_elements):
                         if el['type'] in self.assets and el['variant'] < len(self.assets[el['type']]):
                             img = self.assets[el['type']][el['variant']]
                             rect = pygame.Rect(el['pos'][0], el['pos'][1], img.get_width(), img.get_height())
@@ -312,7 +325,13 @@ class Game:
                                 if action == 'load_map':
                                     target = el.get('target', '1.json')
                                     with open('data/maps/current_play.txt', 'w') as f: f.write(target)
+                                    
+                                    # ОБНУЛЯЄМО МОНЕТИ ПРИ НОВІЙ ГРІ
+                                    self.inventory = {'coin': 0, 'key': 0}
+                                    self.level_start_inventory = {'coin': 0, 'key': 0}
+                                    
                                     self.load_level(f"data/maps/{target}")
+                                    return 
                                 elif action == 'quit_game':
                                     import sys
                                     if 'PySide6' in sys.modules:
@@ -325,6 +344,7 @@ class Game:
                                 elif action == 'open_url':
                                     import webbrowser
                                     webbrowser.open(el.get('target', 'http://google.com'))
+                                    break 
             return
 
         if self.is_dialogue_active:
@@ -347,6 +367,7 @@ class Game:
         if getattr(self, 'level_complete', False):
             self.transition += 1
             if self.transition > 30:
+                self.level_start_inventory = self.inventory.copy()
                 if self.level_list:
                     self.current_level_idx = (self.current_level_idx + 1) % len(self.level_list)
                     self.current_map_name = self.level_list[self.current_level_idx]
@@ -358,6 +379,7 @@ class Game:
                 self.transition = min(30, self.transition + 1)
             if self.dead > 40:
                 if self.current_map_name:
+                    self.inventory = self.level_start_inventory.copy()
                     self.load_level(f"data/maps/{self.current_map_name}")
         else:
             if self.transition < 0:
@@ -367,6 +389,19 @@ class Game:
         self.scroll[1] += (self.player.rect().centery - self.display.get_height() / 2 - self.scroll[1]) / 30
         
         self.clouds.update()
+        
+        for c in self.collectibles.copy():
+            c.update()
+            if not self.dead and self.player.rect().colliderect(c.rect()):
+                if c.type == 'coin': self.inventory['coin'] += c.value
+                elif c.type == 'key': self.inventory['key'] += c.value
+                
+                self.play_sound(self.tile_properties.get(c.spawner_type, {}).get('sfx_hit', 'hit.wav'), 'hit.wav')
+                self.collectibles.remove(c)
+                
+                for i in range(5):
+                    self.sparks.append(Spark(c.rect().center, random.random() * math.pi * 2, 1 + random.random()))
+
         for npc in self.npcs:
             npc.update(self.tilemap, (0, 0))
         for enemy in self.enemies.copy():
@@ -410,7 +445,6 @@ class Game:
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
                                 if fx_key:
-                                    # ФІКС ТУТ: Particle(self, fx_key...) замість Particle(self.game, fx_key...)
                                     self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     
@@ -427,7 +461,7 @@ class Game:
                 if event.key == pygame.K_x: self.player.dash()
                 if event.key == pygame.K_SPACE: self.player.shoot()
                 
-                if event.key == pygame.K_e:
+                if event.key in [pygame.K_e, 1059]: 
                     for npc in self.npcs:
                         if npc.interactable:
                             self.is_dialogue_active = True
@@ -499,6 +533,8 @@ class Game:
         self.clouds.render(self.display_2, offset = render_scroll)
         self.tilemap.render(self.display, offset = render_scroll)
         
+        for c in self.collectibles: c.render(self.display, offset = render_scroll)
+        
         for npc in self.npcs: npc.render(self.display, offset = render_scroll)
         for enemy in self.enemies: enemy.render(self.display, offset = render_scroll)
         if not self.dead: self.player.render(self.display, offset = render_scroll)
@@ -527,6 +563,55 @@ class Game:
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
         surface.blit(self.display_2, screenshake_offset)
 
+        # === ДИНАМІЧНИЙ ІНВЕНТАР З ІКОНКАМИ ===
+        win_w, win_h = surface.get_size()
+        scale_x = win_w / 640
+        ui_font_size = max(16, int(18 * scale_x))
+        ui_font = pygame.font.SysFont('arial', ui_font_size, bold=True)
+        
+        base_x, base_y = max(10, int(10*scale_x)), max(10, int(10*scale_x))
+        current_x = base_x
+        
+        for item_type, amount in self.inventory.items():
+            icon = None
+            
+            # Шукаємо налаштування для цього типу предмета
+            for spawner_name, props in self.tile_properties.items():
+                if props.get('preset') == 'Collectible' and props.get('col_type') == item_type:
+                    # 1. ПРІОРИТЕТ: Беремо іконку з нового поля UI Icon
+                    ui_path = props.get('ui_icon', '')
+                    if ui_path and ui_path in self.assets:
+                        asset = self.assets[ui_path]
+                        icon = asset.images[0] if hasattr(asset, 'images') else asset
+                    
+                    # 2. ФОЛБЕК: Якщо поле порожнє, беремо анімацію спокою
+                    if icon is None:
+                        anim_path = props.get('anim_idle')
+                        if anim_path in self.assets:
+                            asset = self.assets[anim_path]
+                            icon = asset.images[0] if hasattr(asset, 'images') else asset
+                            
+                    # 3. КРАЙНІЙ ВИПАДОК: Беремо картинку самого спавнера
+                    if icon is None and spawner_name in self.assets:
+                        asset = self.assets[spawner_name]
+                        icon = asset[0] if isinstance(asset, list) else asset
+                    break
+                    
+            # Малюємо, якщо знайшли хоча б якусь іконку
+            if icon is not None and (amount > 0 or item_type == 'coin'):
+                icon_w = int(icon.get_width() * scale_x * 1.5)
+                icon_h = int(icon.get_height() * scale_x * 1.5)
+                scaled_icon = pygame.transform.scale(icon, (icon_w, icon_h))
+                surface.blit(scaled_icon, (current_x, base_y))
+                
+                text_x = current_x + icon_w + int(5 * scale_x)
+                text_surf = ui_font.render(f" x {amount}", True, (255, 255, 255))
+                shadow = ui_font.render(f" x {amount}", True, (0, 0, 0))
+                
+                surface.blit(shadow, (text_x + 2, base_y + 2))
+                surface.blit(text_surf, (text_x, base_y))
+                current_x = text_x + text_surf.get_width() + int(20 * scale_x)
+
         if self.is_paused:
             overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
@@ -540,14 +625,12 @@ class Game:
                         if data.get('is_menu', False): pause_ui_elements = data.get('ui_elements', [])
                 except: pass
             
-            win_w, win_h = surface.get_size()
-            big_font_size = max(18, int(18 * (win_w / 640))) 
+            big_font_size = max(18, int(18 * scale_x)) 
             big_font = pygame.font.SysFont('arial', big_font_size, bold=True)
             
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    for el in pause_ui_elements:
-                        scale_x = win_w / 640
+                    for el in reversed(pause_ui_elements):
                         scale_y = win_h / 360
                         folder = el['type']
                         var = el['variant']
@@ -560,12 +643,15 @@ class Game:
                             rect = pygame.Rect(final_x, final_y, final_w, final_h)
                             if rect.collidepoint(mpos_virtual):
                                 action = el.get('action', 'resume_game')
-                                if action == 'resume_game': self.is_paused = False
+                                if action == 'resume_game': 
+                                    self.is_paused = False
+                                    break
                                 elif action == 'load_map':
                                     target = el.get('target', 'menu.json')
                                     with open('data/maps/current_play.txt', 'w') as f: f.write(target)
                                     self.load_level(f"data/maps/{target}")
                                     self.is_paused = False
+                                    break
                                 elif action == 'quit_game':
                                     import sys
                                     if 'PySide6' in sys.modules:
@@ -577,7 +663,6 @@ class Game:
                                     sys.exit()
 
             for el in pause_ui_elements:
-                scale_x = win_w / 640
                 scale_y = win_h / 360
                 folder = el['type']
                 var = el['variant']
@@ -601,8 +686,6 @@ class Game:
                         surface.blit(text_surf, text_rect)
 
         if self.is_dialogue_active and self.dialogue_index < len(self.dialogue_lines):
-            win_w, win_h = surface.get_size()
-            scale_x = win_w / 640
             scale_y = win_h / 360
             
             box_w = int(500 * scale_x)
@@ -613,7 +696,7 @@ class Game:
             pygame.draw.rect(surface, (25, 25, 35), (box_x, box_y, box_w, box_h), border_radius=int(8*scale_x))
             pygame.draw.rect(surface, (255, 204, 0), (box_x, box_y, box_w, box_h), max(2, int(2*scale_x)), border_radius=int(8*scale_x))
             
-            big_font_size = max(18, int(18 * (win_w / 640)))
+            big_font_size = max(18, int(18 * scale_x))
             big_font = pygame.font.SysFont('arial', big_font_size, bold=True)
             
             current_line = self.dialogue_lines[self.dialogue_index]
