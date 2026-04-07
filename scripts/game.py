@@ -528,7 +528,7 @@ class Game:
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
                                 if fx_key:
-                                    self.particles.append(Particle(self.game, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
+                                    self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     
         for spark in self.sparks.copy():

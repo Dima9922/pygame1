@@ -259,6 +259,7 @@ class MainWindow(QMainWindow):
                   self.prop_anim_die_input] 
         if hasattr(self, 'prop_dialogue_input'): inputs.append(self.prop_dialogue_input)
         if hasattr(self, 'prop_dialogue_sound_input'): inputs.append(self.prop_dialogue_sound_input)
+        if hasattr(self, 'prop_col_ui_icon_input'): inputs.append(self.prop_col_ui_icon_input)
             
         for input_field in inputs: input_field.textChanged.connect(self.save_folder_properties)
         
@@ -305,8 +306,7 @@ class MainWindow(QMainWindow):
                 with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     is_menu = data.get('is_menu', False)
-                    # ПРИМУСОВИЙ ЧЕК НА КНОПКИ
-                    if data.get('ui_elements') and len(data['ui_elements']) > 0:
+                    if 'ui_elements' in data:
                         is_menu = True
             except: pass
             
@@ -341,20 +341,22 @@ class MainWindow(QMainWindow):
                 with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
                 
                 current_is_menu = data.get('is_menu', False)
-                # ПРИМУСОВИЙ ЧЕК НА КНОПКИ
-                if data.get('ui_elements') and len(data['ui_elements']) > 0:
+                if 'ui_elements' in data:
                     current_is_menu = True
+                elif 'tilemap' in data:
+                    current_is_menu = False
                     
                 new_is_menu = not current_is_menu
                 data['is_menu'] = new_is_menu
                 
                 if not new_is_menu:
-                    # Якщо робимо рівнем - безжально видаляємо кнопки, щоб не було конфліктів!
                     data.pop('ui_elements', None) 
                     if 'tilemap' not in data: data['tilemap'] = {}
                     if 'tile_size' not in data: data['tile_size'] = 16
                     if 'offgrid' not in data: data['offgrid'] = []
                 else:
+                    data.pop('tilemap', None)
+                    data.pop('offgrid', None)
                     if 'ui_elements' not in data: data['ui_elements'] = []
                 
                 with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
@@ -420,9 +422,10 @@ class MainWindow(QMainWindow):
                     data = json.load(f)
                     is_menu_file = data.get('is_menu', False)
                     
-                    # ПРИМУСОВИЙ ЧЕК НА КНОПКИ
-                    if data.get('ui_elements') and len(data['ui_elements']) > 0:
+                    if 'ui_elements' in data:
                         is_menu_file = True
+                    elif 'tilemap' in data:
+                        is_menu_file = False
                         
                     if is_menu_mode and is_menu_file: valid_maps.append(f_name)
                     elif not is_menu_mode and not is_menu_file: valid_maps.append(f_name)
@@ -454,10 +457,10 @@ class MainWindow(QMainWindow):
                 with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
                 
                 is_menu = data.get('is_menu', False)
-                
-                # ПРИМУСОВИЙ ЧЕК НА КНОПКИ
-                if data.get('ui_elements') and len(data['ui_elements']) > 0:
+                if 'ui_elements' in data:
                     is_menu = True
+                elif 'tilemap' in data:
+                    is_menu = False
                 
                 if is_menu:
                     self.viewport.set_mode("MENU_EDITOR")
@@ -541,7 +544,7 @@ class MainWindow(QMainWindow):
                 self.sfx_title_label.setVisible(False)
     
     def clear_background(self):
-        if self.viewport.mode == "MENU_EDITOR": 
+        if self.btn_toggle_editor.isChecked(): 
             self.viewport.menu_editor.bg_path = None
             self.viewport.menu_editor.bg_music = None 
         else:
@@ -695,7 +698,7 @@ class MainWindow(QMainWindow):
         self.prop_title.setText(f"Properties: {folder_name}")
         self.properties_panel.show()
         
-        if self.viewport.mode == "MENU_EDITOR":
+        if self.btn_toggle_editor.isChecked():
             bg_path = getattr(self.viewport.menu_editor, 'bg_path', None)
             bg_music = getattr(self.viewport.menu_editor, 'bg_music', None) 
         else:
@@ -824,7 +827,7 @@ class MainWindow(QMainWindow):
         for w in widgets: w.blockSignals(False)
     
     def save_folder_properties(self):
-        if self.viewport.mode == "MENU_EDITOR":
+        if self.btn_toggle_editor.isChecked():
             sel_idx = getattr(self.viewport.menu_editor, 'selected_index', None)
             if sel_idx is not None and sel_idx < len(self.viewport.menu_editor.ui_elements):
                 el = self.viewport.menu_editor.ui_elements[sel_idx]
@@ -962,7 +965,7 @@ class MainWindow(QMainWindow):
             if len(parts) == 1: self.btn_add_audio.show()
             elif len(parts) == 2: 
                 if self.prop_type_combo.currentText() == "Background":
-                    if self.viewport.mode == "MENU_EDITOR":
+                    if self.btn_toggle_editor.isChecked():
                         self.viewport.menu_editor.bg_music = parts[1]
                     else:
                         self.viewport.editor.tilemap.bg_music = parts[1]
@@ -974,7 +977,7 @@ class MainWindow(QMainWindow):
         if parts and parts[0] == "Tiles" and len(parts) == 2:
             if self.prop_type_combo.currentText() == "Background":
                 bg_str = f"{parts[1]}/{index.row()}"
-                if self.viewport.mode == "MENU_EDITOR": self.viewport.menu_editor.bg_path = bg_str
+                if self.btn_toggle_editor.isChecked(): self.viewport.menu_editor.bg_path = bg_str
                 else: self.viewport.editor.tilemap.bg_path = bg_str
                 if hasattr(self, 'prop_current_bg_label'): self.prop_current_bg_label.setText(f"Active BG: {parts[1]} (Image {index.row()})")
                 self.viewport.set_current_tile(None, 0)
@@ -983,37 +986,39 @@ class MainWindow(QMainWindow):
 
     def on_save_clicked(self):
         map_name = self.map_combo.currentText()
-        if map_name:
-            path = f'data/maps/{map_name}'
-            existing_data = {}
-            if os.path.exists(path):
-                try:
-                    with open(path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
-                except: pass
+        if not map_name: return
+        path = f'data/maps/{map_name}'
+        existing_data = {}
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
+            except: pass
+            
+        is_menu_mode = self.btn_toggle_editor.isChecked()
+        
+        if is_menu_mode:
+            self.viewport.menu_editor.save(path)
+            print(f"Меню успішно збережено в {path}!")
+        else:
+            self.viewport.editor.tilemap.save(path)
+            print(f"Мапу успішно збережено в {path}!")
+            
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f: new_data = json.load(f)
+                if 'level_order' in existing_data: new_data['level_order'] = existing_data['level_order']
+                if 'ignore_in_progression' in existing_data: new_data['ignore_in_progression'] = existing_data['ignore_in_progression']
                 
-            if self.viewport.mode == "MENU_EDITOR":
-                self.viewport.menu_editor.save(path)
-                print(f"Меню успішно збережено в {path}!")
-            else:
-                self.viewport.editor.tilemap.save(path)
-                print(f"Мапу успішно збережено в {path}!")
-                
-            if os.path.exists(path):
-                try:
-                    with open(path, 'r', encoding='utf-8') as f: new_data = json.load(f)
-                    if 'level_order' in existing_data: new_data['level_order'] = existing_data['level_order']
-                    if 'ignore_in_progression' in existing_data: new_data['ignore_in_progression'] = existing_data['ignore_in_progression']
+                if is_menu_mode:
+                    new_data['is_menu'] = True
+                    new_data['bg_music'] = getattr(self.viewport.menu_editor, 'bg_music', None)
+                else:
+                    new_data['is_menu'] = False
+                    if 'bg_music' not in new_data:
+                        new_data['bg_music'] = getattr(self.viewport.editor.tilemap, 'bg_music', None)
                     
-                    if self.viewport.mode == "MENU_EDITOR":
-                        new_data['is_menu'] = True
-                        new_data['bg_music'] = getattr(self.viewport.menu_editor, 'bg_music', None)
-                    else:
-                        new_data['is_menu'] = False
-                        if 'bg_music' not in new_data:
-                            new_data['bg_music'] = getattr(self.viewport.editor.tilemap, 'bg_music', None)
-                        
-                    with open(path, 'w', encoding='utf-8') as f: json.dump(new_data, f, ensure_ascii=False, indent=4)
-                except: pass
+                with open(path, 'w', encoding='utf-8') as f: json.dump(new_data, f, ensure_ascii=False, indent=4)
+            except: pass
 
     def on_play_clicked(self):
         if self.btn_play.text() == "▶ PLAY":
