@@ -25,7 +25,8 @@ class Game:
         self.dialogue_index = 0
         self.active_npc = None
         
-        # --- НАЛАШТУВАННЯ ТА СИСТЕМА КОНФІГІВ ---
+        self.current_music_track = None 
+        
         self.resolutions = [(640, 360), (960, 540), (1280, 720), (1600, 900), (1920, 1080)]
         self.config = {
             "music": True, 
@@ -44,7 +45,6 @@ class Game:
         else:
             self.save_config()
         
-        # --- ІНВЕНТАР ТА ЗБЕРЕЖЕННЯ ---
         self.inventory = {'coin': 0, 'key': 0}
         self.level_start_inventory = {'coin': 0, 'key': 0} 
         
@@ -238,10 +238,8 @@ class Game:
                 map_data = json.load(f)
                 
                 is_menu = map_data.get('is_menu', False)
-                # === ПРИМУСОВИЙ ЧЕК НА МЕНЮ ===
                 if map_data.get('ui_elements') and len(map_data['ui_elements']) > 0:
                     is_menu = True
-                # ==============================
                 
                 if is_menu:
                     self.is_menu_mode = True
@@ -252,32 +250,36 @@ class Game:
                         if folder in self.assets and int(variant) < len(self.assets[folder]):
                             self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], (640, 360))
                     
-                    pygame.mixer.music.stop()
                     level_music = map_data.get('bg_music', None)
-                    if level_music and self.config.get('music', True):
-                        path = f"data/sfx/{level_music}"
-                        if os.path.exists(path):
-                            try:
-                                pygame.mixer.music.load(path)
-                                pygame.mixer.music.set_volume(0.5)
-                                pygame.mixer.music.play(-1)
-                            except: pass
+                    if level_music != self.current_music_track:
+                        pygame.mixer.music.stop()
+                        self.current_music_track = level_music
+                        if level_music and self.config.get('music', True):
+                            path = f"data/sfx/{level_music}"
+                            if os.path.exists(path):
+                                try:
+                                    pygame.mixer.music.load(path)
+                                    pygame.mixer.music.set_volume(0.5)
+                                    pygame.mixer.music.play(-1)
+                                except: pass
                     return 
         except FileNotFoundError: pass
 
         try: self.tilemap.load(map_path)
         except (FileNotFoundError, KeyError): pass
             
-        pygame.mixer.music.stop()
         level_music = getattr(self.tilemap, 'bg_music', None)
-        if level_music and self.config.get('music', True):
-            path = f"data/sfx/{level_music}"
-            if os.path.exists(path):
-                try:
-                    pygame.mixer.music.load(path)
-                    pygame.mixer.music.set_volume(0.5)
-                    pygame.mixer.music.play(-1)
-                except: pass
+        if level_music != self.current_music_track:
+            pygame.mixer.music.stop()
+            self.current_music_track = level_music
+            if level_music and self.config.get('music', True):
+                path = f"data/sfx/{level_music}"
+                if os.path.exists(path):
+                    try:
+                        pygame.mixer.music.load(path)
+                        pygame.mixer.music.set_volume(0.5)
+                        pygame.mixer.music.play(-1)
+                    except: pass
             
         if getattr(self.tilemap, 'bg_path', None):
             try:
@@ -398,7 +400,8 @@ class Game:
                                     break 
                                 elif action == 'toggle_music':
                                     self.config['music'] = not self.config['music']
-                                    if not self.config['music']: pygame.mixer.music.stop()
+                                    if not self.config['music']: 
+                                        pygame.mixer.music.stop()
                                     else:
                                         level_music = getattr(self.tilemap, 'bg_music', None)
                                         if getattr(self, 'is_menu_mode', False):
@@ -411,6 +414,7 @@ class Game:
                                             try: 
                                                 pygame.mixer.music.load(f"data/sfx/{level_music}")
                                                 pygame.mixer.music.play(-1)
+                                                self.current_music_track = level_music
                                             except: pass
                                     self.save_config()
                                     break
@@ -528,6 +532,7 @@ class Game:
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
                                 if fx_key:
+                                    # === ФІКС ТУТ: Particle(self, ...) замість Particle(self.game, ...) ===
                                     self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     
@@ -659,7 +664,6 @@ class Game:
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
         surface.blit(self.display_2, screenshake_offset)
 
-        # === ДИНАМІЧНИЙ ІНВЕНТАР З ІКОНКАМИ ===
         win_w, win_h = surface.get_size()
         scale_x = win_w / 640
         ui_font_size = max(16, int(18 * scale_x))
@@ -672,15 +676,11 @@ class Game:
             icon = None
             for spawner_name, props in self.tile_properties.items():
                 if props.get('preset') == 'Collectible' and props.get('col_type') == item_type:
-                    ui_path = props.get('ui_icon', '')
-                    if ui_path and ui_path in self.assets:
-                        asset = self.assets[ui_path]
+                    # Більше ніяких UI Icon Path!
+                    anim_path = props.get('anim_idle')
+                    if anim_path in self.assets:
+                        asset = self.assets[anim_path]
                         icon = asset.images[0] if hasattr(asset, 'images') else asset
-                    if icon is None:
-                        anim_path = props.get('anim_idle')
-                        if anim_path in self.assets:
-                            asset = self.assets[anim_path]
-                            icon = asset.images[0] if hasattr(asset, 'images') else asset
                     if icon is None and spawner_name in self.assets:
                         asset = self.assets[spawner_name]
                         icon = asset[0] if isinstance(asset, list) else asset

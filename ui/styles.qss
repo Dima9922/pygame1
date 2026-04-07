@@ -1,36 +1,51 @@
-/* Головне вікно */
+/* === ГОЛОВНЕ ВІКНО === */
 QMainWindow, QWidget {
     background-color: #1e1e1e;
     color: #e0e0e0;
     font-family: "Segoe UI", sans-serif;
 }
 
-/* Панелі */
+/* === ВЕРХНЯ ПАНЕЛЬ (TOOLBAR) === */
 QFrame#Toolbar {
-    background-color: #2d2d2d;
-    border-bottom: 1px solid #333;
+    background-color: #1e1e1e;
+    border-bottom: 1px solid #000000;
 }
 
-QTreeView {
-    background-color: #252525;
-    border: none;
-    outline: 0;
+QFrame#Toolbar QLabel {
+    color: #cccccc;
+    font-weight: bold;
 }
 
-/* Кнопки */
-QPushButton {
-    background-color: #3d3d3d;
-    border: 1px solid #444;
+QComboBox {
+    background-color: #2d2d30;
+    color: #ffffff;
+    border: 1px solid #3e3e42;
     border-radius: 4px;
-    padding: 5px 15px;
-    color: white;
+    padding: 3px;
+}
+
+/* === БАЗОВІ КНОПКИ === */
+QPushButton {
+    background-color: #2d2d30;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: bold;
 }
 
 QPushButton:hover {
-    background-color: #4d4d4d;
+    background-color: #3e3e42;
+    color: #ffffff;
+    border: 1px solid #007acc;
 }
 
-/* СИНЯ КНОПКА (як на макеті) */
+QPushButton:pressed {
+    background-color: #1e1e1e;
+}
+
+/* === СПЕЦІАЛЬНА СИНЯ КНОПКА (ДОДАТИ ПАПКУ) === */
 QPushButton#NewFolderBtn {
     background-color: #0078d7;
     border: none;
@@ -42,30 +57,20 @@ QPushButton#NewFolderBtn:hover {
     background-color: #0086f0;
 }
 
-/* Розділювачі панелей */
+/* === ДЕРЕВО ПРОЕКТУ === */
+QTreeView {
+    background-color: #252525;
+    border: none;
+    outline: 0;
+}
+
+/* === РОЗДІЛЮВАЧІ ПАНЕЛЕЙ (SPLITTERS) === */
 QSplitter::handle {
-    background-color: #333;
+    background-color: #333333;
 }
-
-/* Список асетів */
-QListWidget {
-    background-color: #1a1a1a;
-    border: 1px solid #333;
-    border-radius: 4px;
-    outline: none;
+QSplitter::handle:horizontal {
+    width: 2px;
 }
-
-QListWidget::item {
-    color: #bbb;
-    padding: 5px;
-}
-
-QListWidget::item:selected {
-    background-color: #0078d7;
-    color: white;
-    border-radius: 4px;
-}
-
-QListWidget::item:hover {
-    background-color: #333;
+QSplitter::handle:vertical {
+    height: 2px;
 }

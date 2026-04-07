@@ -201,21 +201,9 @@ class MainWindow(QMainWindow):
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_label)
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_input)
         
-        self.btn_toggle_editor = QPushButton("🎨 Menu Editor")
-        self.btn_toggle_editor.setCheckable(True)
-        self.btn_toggle_editor.setToolTip("Switch between Level Editor and UI Editor")
-        self.toolbar_layout.insertWidget(5, self.btn_toggle_editor)
+        # ПІДКЛЮЧЕННЯ КНОПОК ПАНЕЛІ, ЯКІ ТЕПЕР СТВОРЕНІ В main_window_ui.py
         self.btn_toggle_editor.toggled.connect(self.on_editor_mode_toggled)
-        
-        self.btn_level_sequence = QPushButton("🚥 Level Sequence")
-        self.btn_level_sequence.setToolTip("Manage Level Order & Progression")
-        self.toolbar_layout.insertWidget(6, self.btn_level_sequence)
         self.btn_level_sequence.clicked.connect(self.open_level_sequence)
-        
-        self.btn_build_game = QPushButton("🚀 Build Game")
-        self.btn_build_game.setToolTip("Compile game to .exe and export")
-        self.btn_build_game.setStyleSheet("background-color: #007acc; color: white; font-weight: bold;")
-        self.toolbar_layout.insertWidget(7, self.btn_build_game)
         self.btn_build_game.clicked.connect(self.on_build_game_clicked)
         
         os.makedirs('data/maps', exist_ok=True)
@@ -229,8 +217,8 @@ class MainWindow(QMainWindow):
         self.map_combo.currentTextChanged.connect(self.on_map_changed)
         self.btn_new_map.clicked.connect(self.on_new_map_clicked)
         self.btn_delete_map.clicked.connect(self.on_delete_map_clicked)
-        if hasattr(self, 'btn_change_type'): self.btn_change_type.clicked.connect(self.on_change_map_type_clicked)
-        if hasattr(self, 'btn_set_pause'): self.btn_set_pause.clicked.connect(self.on_set_pause_clicked)
+        self.btn_change_type.clicked.connect(self.on_change_map_type_clicked)
+        self.btn_set_pause.clicked.connect(self.on_set_pause_clicked)
         self.btn_save.clicked.connect(self.on_save_clicked)
         self.btn_play.clicked.connect(self.on_play_clicked)
         self.tree_view.clicked.connect(self.on_folder_clicked)
@@ -259,7 +247,7 @@ class MainWindow(QMainWindow):
                   self.prop_anim_die_input] 
         if hasattr(self, 'prop_dialogue_input'): inputs.append(self.prop_dialogue_input)
         if hasattr(self, 'prop_dialogue_sound_input'): inputs.append(self.prop_dialogue_sound_input)
-        if hasattr(self, 'prop_col_ui_icon_input'): inputs.append(self.prop_col_ui_icon_input)
+        # ВИДАЛИЛИ prop_col_ui_icon_input
             
         for input_field in inputs: input_field.textChanged.connect(self.save_folder_properties)
         
@@ -306,12 +294,12 @@ class MainWindow(QMainWindow):
                 with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     is_menu = data.get('is_menu', False)
-                    if 'ui_elements' in data:
+                    if data.get('ui_elements') and len(data['ui_elements']) > 0:
                         is_menu = True
             except: pass
             
         if not is_menu:
-            QMessageBox.warning(self, "Увага", "Тільки мапи типу 'МЕНЮ' можуть бути меню паузи!\nСпочатку зміни тип карти (кнопка 🔄 Change Type).")
+            QMessageBox.warning(self, "Увага", "Тільки мапи типу 'МЕНЮ' можуть бути меню паузи!\nСпочатку зміни тип карти (кнопка 🔄 Type).")
             return
 
         config_path = 'data/config.json'
@@ -341,10 +329,8 @@ class MainWindow(QMainWindow):
                 with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
                 
                 current_is_menu = data.get('is_menu', False)
-                if 'ui_elements' in data:
+                if data.get('ui_elements') and len(data['ui_elements']) > 0:
                     current_is_menu = True
-                elif 'tilemap' in data:
-                    current_is_menu = False
                     
                 new_is_menu = not current_is_menu
                 data['is_menu'] = new_is_menu
@@ -390,14 +376,16 @@ class MainWindow(QMainWindow):
     def on_editor_mode_toggled(self, checked):
         if checked:
             self.btn_toggle_editor.setText("🌍 Level Editor")
-            self.btn_toggle_editor.setStyleSheet("background-color: #28a745; color: white; font-weight: bold;")
+            self.btn_toggle_editor.setStyleSheet("background-color: #28a745; color: white; border: none; font-weight: bold;")
             self.viewport.set_mode("MENU_EDITOR")
             self.prop_title.setText("Properties: UI Editor")
+            self.btn_set_pause.show() 
         else:
             self.btn_toggle_editor.setText("🎨 Menu Editor")
             self.btn_toggle_editor.setStyleSheet("")
             self.viewport.set_mode("EDITOR")
             self.prop_title.setText("Properties")
+            self.btn_set_pause.hide() 
             
         self.update_map_list()
         current_map = self.map_combo.currentText()
@@ -614,9 +602,6 @@ class MainWindow(QMainWindow):
             self.prop_col_type_combo.setVisible(is_collectible)
             self.prop_col_value_label.setVisible(is_collectible)
             self.prop_col_value_input.setVisible(is_collectible)
-            if hasattr(self, 'prop_col_ui_icon_input'):
-                self.prop_col_ui_icon_label.setVisible(is_collectible)
-                self.prop_col_ui_icon_input.setVisible(is_collectible)
             
         if hasattr(self, 'sfx_container'):
             is_spawner = (self.prop_type_combo.currentText() == "Spawner")
@@ -653,7 +638,6 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
             if hasattr(self, 'prop_col_type_combo'): 
                 widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
-                if hasattr(self, 'prop_col_ui_icon_input'): widgets.append(self.prop_col_ui_icon_input)
             for w in widgets: w.blockSignals(True)
             
             self.prop_type_combo.setCurrentText("Static Blocks")
@@ -676,7 +660,6 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'prop_col_type_combo'):
                 self.prop_col_type_combo.setCurrentText("coin")
                 self.prop_col_value_input.setValue(1)
-                if hasattr(self, 'prop_col_ui_icon_input'): self.prop_col_ui_icon_input.setText("")
             self.prop_collision_cb.setChecked(True)
             self.prop_visible_cb.setChecked(True)
             self.prop_walk_cb.setChecked(False)
@@ -725,7 +708,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
         if hasattr(self, 'prop_col_type_combo'): 
             widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
-            if hasattr(self, 'prop_col_ui_icon_input'): widgets.append(self.prop_col_ui_icon_input)
             
         for w in widgets: w.blockSignals(True)
         
@@ -757,7 +739,6 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'prop_col_type_combo'):
                     self.prop_col_type_combo.setCurrentText(data.get('col_type', 'coin'))
                     self.prop_col_value_input.setValue(data.get('col_value', 1))
-                    if hasattr(self, 'prop_col_ui_icon_input'): self.prop_col_ui_icon_input.setText(data.get('ui_icon', ''))
                 
                 sfx_hit = data.get('sfx_hit', 'hit.wav')
                 sfx_jump = data.get('sfx_jump', 'jump.wav')
@@ -806,7 +787,6 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'prop_col_type_combo'):
                 self.prop_col_type_combo.setCurrentText("coin")
                 self.prop_col_value_input.setValue(1)
-                if hasattr(self, 'prop_col_ui_icon_input'): self.prop_col_ui_icon_input.setText("")
             self.prop_sfx_hit_slider.setValue(60)
             self.prop_sfx_jump_slider.setValue(60)
             self.prop_sfx_dash_slider.setValue(60)
@@ -872,7 +852,6 @@ class MainWindow(QMainWindow):
             'dialogue_sound': self.prop_dialogue_sound_input.text() if hasattr(self, 'prop_dialogue_sound_input') else 'talk.wav',
             'col_type': self.prop_col_type_combo.currentText() if hasattr(self, 'prop_col_type_combo') else 'coin',
             'col_value': self.prop_col_value_input.value() if hasattr(self, 'prop_col_value_input') else 1,
-            'ui_icon': self.prop_col_ui_icon_input.text() if hasattr(self, 'prop_col_ui_icon_input') else '',
             'sfx_hit': self.prop_sfx_hit_input.text() if hasattr(self, 'prop_sfx_hit_input') else 'hit.wav',
             'sfx_jump': self.prop_sfx_jump_input.text() if hasattr(self, 'prop_sfx_jump_input') else 'jump.wav',
             'sfx_dash': self.prop_sfx_dash_input.text() if hasattr(self, 'prop_sfx_dash_input') else 'dash.wav',
@@ -1025,7 +1004,7 @@ class MainWindow(QMainWindow):
             self.on_save_clicked() 
             with open('data/maps/current_play.txt', 'w') as f: f.write(self.map_combo.currentText())
             self.btn_play.setText("■ STOP")
-            self.btn_play.setStyleSheet("background-color: #d73a49; color: white; font-weight: bold;")
+            self.btn_play.setStyleSheet("background-color: #d73a49; color: white; border: none; font-weight: bold;")
             self.sidebar_panel.hide()
             self.browser_scroll.hide() 
             self.properties_panel.hide()
@@ -1034,7 +1013,7 @@ class MainWindow(QMainWindow):
             self.viewport.setFocus()
         else:
             self.btn_play.setText("▶ PLAY")
-            self.btn_play.setStyleSheet("")
+            self.btn_play.setStyleSheet("background-color: #28a745; color: white; border: none; font-weight: bold;")
             try:
                 pygame.mixer.music.stop()
                 pygame.mixer.stop()

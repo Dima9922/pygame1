@@ -82,20 +82,14 @@ class NumiViewport(QWidget):
                 try:
                     with open(pause_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
-                        
                         is_pause_menu = data.get('is_menu', False)
-                        # === ПРИМУСОВИЙ ЧЕК НА МЕНЮ ===
                         if data.get('ui_elements') and len(data['ui_elements']) > 0:
                             is_pause_menu = True
-                        # ==============================
-                        
                         if is_pause_menu:
                             self.pause_ui_elements = data.get('ui_elements', [])
                 except: pass
         
-        # === НАЙГОЛОВНІШИЙ ЗАГУБЛЕНИЙ РЯДОК ===
         self.mode = new_mode
-        # =======================================
             
     def mouseMoveEvent(self, event):
         self.mpos = (event.position().x(), event.position().y())
@@ -172,9 +166,11 @@ class NumiViewport(QWidget):
             pause_triggered = False
             for event in self.mock_events:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    self.set_mode("PAUSE")
-                    pause_triggered = True
-                    break
+                    # === ФІКС: ПАУЗА ТІЛЬКИ НА РІВНЯХ ===
+                    if not self.game.is_menu_mode:
+                        self.set_mode("PAUSE")
+                        pause_triggered = True
+                        break
                     
             if not pause_triggered:
                 self.game.update(self.mock_events, mpos_virtual)
@@ -203,7 +199,7 @@ class NumiViewport(QWidget):
                                 img = self.assets[el['type']][el['variant']]
                                 rect = pygame.Rect(el['pos'][0], el['pos'][1], img.get_width(), img.get_height())
                                 if rect.collidepoint((cmx, cmy)):
-                                    action = el.get('action', 'load_map') 
+                                    action = el.get('action', 'load_map')
                                     
                                     if action == 'resume_game':
                                         self.set_mode("PLAY")

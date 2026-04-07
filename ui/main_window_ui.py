@@ -19,34 +19,70 @@ def setup_ui(main_window, assets):
     main_window.main_layout.setSpacing(0)
 
     main_window.toolbar = QFrame()
-    main_window.toolbar.setFixedHeight(40)
+    main_window.toolbar.setFixedHeight(45)
     main_window.toolbar.setObjectName("Toolbar")
+    
     main_window.toolbar_layout = QHBoxLayout(main_window.toolbar)
-    
-    main_window.map_combo = QComboBox()
-    main_window.btn_new_map = QPushButton("+ New Map")
-    main_window.btn_delete_map = QPushButton("❌ Delete Map")
-    main_window.btn_delete_map.setStyleSheet("color: #d73a49;")
-    main_window.btn_change_type = QPushButton("🔄 Change Type") 
-    main_window.btn_change_type.setToolTip("Змінити тип карти (Меню <-> Ігровий Рівень)")
-    
-    # === НОВА КНОПКА ===
-    main_window.btn_set_pause = QPushButton("⏸ Set as Pause")
-    main_window.btn_set_pause.setToolTip("Призначити поточну карту як Меню Паузи")
-    # ===================
+    main_window.toolbar_layout.setContentsMargins(10, 5, 10, 5)
+    main_window.toolbar_layout.setSpacing(8)
 
-    main_window.btn_save = QPushButton("Save Map")
-    main_window.btn_play = QPushButton("▶ PLAY")
-    
+    # Блок 1: Керування мапами
     main_window.toolbar_layout.addWidget(QLabel("Map:"))
+    main_window.map_combo = QComboBox()
+    main_window.map_combo.setMinimumWidth(120)
     main_window.toolbar_layout.addWidget(main_window.map_combo)
+    
+    main_window.btn_new_map = QPushButton("+ New")
+    main_window.btn_delete_map = QPushButton("❌ Delete")
+    main_window.btn_delete_map.setStyleSheet("color: #f44336;")
     main_window.toolbar_layout.addWidget(main_window.btn_new_map)
     main_window.toolbar_layout.addWidget(main_window.btn_delete_map)
+
+    # Розділювач
+    div1 = QFrame()
+    div1.setFrameShape(QFrame.VLine)
+    div1.setStyleSheet("color: #444;")
+    main_window.toolbar_layout.addWidget(div1)
+
+    # Блок 2: Режими та Пауза
+    main_window.btn_change_type = QPushButton("🔄 Type") 
+    main_window.btn_change_type.setToolTip("Змінити тип карти (Меню <-> Ігровий Рівень)")
+    main_window.btn_toggle_editor = QPushButton("🎨 Menu Editor")
+    main_window.btn_toggle_editor.setCheckable(True)
+    main_window.btn_set_pause = QPushButton("⏸ Set as Pause")
+    main_window.btn_set_pause.setStyleSheet("color: #ffeb3b;")
+    main_window.btn_set_pause.hide() 
+    
     main_window.toolbar_layout.addWidget(main_window.btn_change_type)
-    main_window.toolbar_layout.addWidget(main_window.btn_set_pause) # ДОДАЛИ СЮДИ
+    main_window.toolbar_layout.addWidget(main_window.btn_toggle_editor)
+    main_window.toolbar_layout.addWidget(main_window.btn_set_pause)
+
+    # Розділювач
+    div2 = QFrame()
+    div2.setFrameShape(QFrame.VLine)
+    div2.setStyleSheet("color: #444;")
+    main_window.toolbar_layout.addWidget(div2)
+
+    # Блок 3: Білд та Сюжет
+    main_window.btn_level_sequence = QPushButton("🚥 Sequence")
+    main_window.btn_build_game = QPushButton("🚀 Build Game")
+    main_window.btn_build_game.setStyleSheet("background-color: #007acc; color: white; border: none; font-weight: bold;")
+    
+    main_window.toolbar_layout.addWidget(main_window.btn_level_sequence)
+    main_window.toolbar_layout.addWidget(main_window.btn_build_game)
+
+    # Відступ, щоб притиснути Save і Play вправо
     main_window.toolbar_layout.addStretch()
+
+    # Блок 4: Збереження та Гра
+    main_window.btn_save = QPushButton("💾 Save")
+    main_window.btn_play = QPushButton("▶ PLAY")
+    main_window.btn_save.setStyleSheet("background-color: #007acc; color: white; border: none; font-weight: bold;")
+    main_window.btn_play.setStyleSheet("background-color: #28a745; color: white; border: none; font-weight: bold;")
+    
     main_window.toolbar_layout.addWidget(main_window.btn_save)
     main_window.toolbar_layout.addWidget(main_window.btn_play)
+    
     main_window.main_layout.addWidget(main_window.toolbar)
 
     main_window.horizontal_splitter = QSplitter(Qt.Horizontal)
@@ -104,6 +140,7 @@ def setup_ui(main_window, assets):
     main_window.sidebar_layout.addWidget(main_window.btn_add_audio)
 
     main_window.btn_new_folder = QPushButton("+ Folder")
+    main_window.btn_new_folder.setObjectName("NewFolderBtn") # Для QSS
     main_window.sidebar_layout.addWidget(main_window.btn_new_folder)
     main_window.sidebar_panel.setWidget(main_window.sidebar_widget)
 
@@ -261,9 +298,6 @@ def setup_ui(main_window, assets):
     main_window.prop_col_value_label = QLabel("Value / Heal Amount:")
     main_window.prop_col_value_input = QSpinBox()
     main_window.prop_col_value_input.setRange(1, 999)
-    main_window.prop_col_ui_icon_label = QLabel("UI Icon Path (Optional):")
-    main_window.prop_col_ui_icon_input = QLineEdit()
-    main_window.prop_col_ui_icon_input.setPlaceholderText("Напр: coins/idle або ui/icon.png")
     
     main_window.prop_spawner_layout.addWidget(main_window.prop_shoot_cb)
     main_window.prop_spawner_layout.addWidget(main_window.prop_weapon_img_label)
@@ -284,8 +318,6 @@ def setup_ui(main_window, assets):
     main_window.prop_spawner_layout.addWidget(main_window.prop_col_type_combo)
     main_window.prop_spawner_layout.addWidget(main_window.prop_col_value_label)
     main_window.prop_spawner_layout.addWidget(main_window.prop_col_value_input)
-    main_window.prop_spawner_layout.addWidget(main_window.prop_col_ui_icon_label)
-    main_window.prop_spawner_layout.addWidget(main_window.prop_col_ui_icon_input)
 
     main_window.properties_layout.addWidget(main_window.prop_spawner_container)
 
