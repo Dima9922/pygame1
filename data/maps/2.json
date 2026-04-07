@@ -3933,7 +3933,8 @@
         }
     ],
     "bg_path": "bg/0",
-    "bg_music": null,
+    "bg_music": "music.wav",
     "level_order": 3,
-    "ignore_in_progression": false
+    "ignore_in_progression": false,
+    "is_menu": false
 }

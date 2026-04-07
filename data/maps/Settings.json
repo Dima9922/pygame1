@@ -3422,7 +3422,6 @@
     ],
     "bg_path": "bg/1",
     "bg_music": "ambience.wav",
-    "level_order": 2,
-    "ignore_in_progression": false,
+    "ignore_in_progression": true,
     "is_menu": false
 }

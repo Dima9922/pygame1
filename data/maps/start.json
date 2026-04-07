@@ -895,5 +895,6 @@
     "bg_path": "bg/0",
     "bg_music": null,
     "level_order": 1,
-    "ignore_in_progression": false
+    "ignore_in_progression": false,
+    "is_menu": false
 }

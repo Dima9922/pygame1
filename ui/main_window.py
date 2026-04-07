@@ -3,13 +3,21 @@ import os
 import shutil
 import json
 import pygame
+import traceback
 from PySide6.QtWidgets import (QMainWindow, QInputDialog, QFileDialog, QMessageBox, QApplication, QMenu, QComboBox, QCheckBox, QListWidgetItem, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QLineEdit, QDialog, QFormLayout, QDialogButtonBox, QSpinBox, QListWidget, QAbstractItemView, QTextEdit, QProgressBar)
-from PySide6.QtCore import QSize, Qt, QProcess
-from PySide6.QtGui import QIcon, QPixmap, QImage
+from PySide6.QtCore import QSize, Qt, QProcess, QObject, Signal
+from PySide6.QtGui import QIcon, QPixmap, QImage, QTextCursor, QColor
 from scripts.utils import load_images
 from ui.main_window_ui import setup_ui, create_item
 
 valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.webp')
+
+class OutputWrapper(QObject):
+    text_written = Signal(str)
+    def write(self, text):
+        self.text_written.emit(text)
+    def flush(self):
+        pass
 
 class BuildDialog(QDialog):
     def __init__(self, dest_path, game_name, parent=None):
@@ -172,6 +180,22 @@ class MainWindow(QMainWindow):
         
         setup_ui(self, assets)
         
+        self.stdout_wrapper = OutputWrapper()
+        self.stdout_wrapper.text_written.connect(self.append_log)
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+        sys.stdout = self.stdout_wrapper
+        sys.stderr = self.stdout_wrapper
+        
+        def global_exception_handler(exctype, value, tb):
+            err_msg = "".join(traceback.format_exception(exctype, value, tb))
+            if hasattr(sys.stdout, 'write'):
+                sys.stdout.write(err_msg)
+            sys.__excepthook__(exctype, value, tb)
+        sys.excepthook = global_exception_handler
+        
+        print("NumiEngine Initialized. Ready for work! 🚀")
+        
         self.prop_anim_die_label = QLabel("Death Effect (Anim):")
         self.prop_anim_die_input = QLineEdit("particle/particle")
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_label)
@@ -204,7 +228,9 @@ class MainWindow(QMainWindow):
 
         self.map_combo.currentTextChanged.connect(self.on_map_changed)
         self.btn_new_map.clicked.connect(self.on_new_map_clicked)
-        self.btn_delete_map.clicked.connect(self.on_delete_map_clicked) 
+        self.btn_delete_map.clicked.connect(self.on_delete_map_clicked)
+        if hasattr(self, 'btn_change_type'): self.btn_change_type.clicked.connect(self.on_change_map_type_clicked)
+        if hasattr(self, 'btn_set_pause'): self.btn_set_pause.clicked.connect(self.on_set_pause_clicked)
         self.btn_save.clicked.connect(self.on_save_clicked)
         self.btn_play.clicked.connect(self.on_play_clicked)
         self.tree_view.clicked.connect(self.on_folder_clicked)
@@ -253,6 +279,97 @@ class MainWindow(QMainWindow):
             self.prop_col_type_combo.currentIndexChanged.connect(self.save_folder_properties)
             self.prop_col_value_input.valueChanged.connect(self.save_folder_properties)
 
+    def append_log(self, text):
+        if not text.strip() and text != '\n': return
+        self.console_output.moveCursor(QTextCursor.End)
+        lower_text = text.lower()
+        if "помилка" in lower_text or "error" in lower_text or "traceback" in lower_text or "exception" in lower_text or "typeerror" in lower_text:
+            self.console_output.setTextColor(QColor("#ff4444")) 
+        elif "попередження" in lower_text or "warning" in lower_text:
+            self.console_output.setTextColor(QColor("#ffcc00")) 
+        elif "успішно" in lower_text or "✅" in text or "🚀" in text:
+            self.console_output.setTextColor(QColor("#28a745")) 
+        else:
+            self.console_output.setTextColor(QColor("#cccccc")) 
+        self.console_output.insertPlainText(text)
+        self.console_output.moveCursor(QTextCursor.End)
+
+    def on_set_pause_clicked(self):
+        map_name = self.map_combo.currentText()
+        if not map_name: return
+        
+        path = f'data/maps/{map_name}'
+        is_menu = False
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    is_menu = data.get('is_menu', False)
+                    # ПРИМУСОВИЙ ЧЕК НА КНОПКИ
+                    if data.get('ui_elements') and len(data['ui_elements']) > 0:
+                        is_menu = True
+            except: pass
+            
+        if not is_menu:
+            QMessageBox.warning(self, "Увага", "Тільки мапи типу 'МЕНЮ' можуть бути меню паузи!\nСпочатку зміни тип карти (кнопка 🔄 Change Type).")
+            return
+
+        config_path = 'data/config.json'
+        config = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            except: pass
+            
+        config['pause_map'] = map_name
+        
+        os.makedirs('data', exist_ok=True)
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4)
+            
+        print(f"✅ Карту '{map_name}' встановлено як Меню Паузи!")
+        QMessageBox.information(self, "Успіх", f"Карту '{map_name}' успішно встановлено як Меню Паузи!\nТепер вона буде відкриватися при натисканні ESC.")
+
+    def on_change_map_type_clicked(self):
+        map_name = self.map_combo.currentText()
+        if not map_name: return
+        
+        path = f'data/maps/{map_name}'
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
+                
+                current_is_menu = data.get('is_menu', False)
+                # ПРИМУСОВИЙ ЧЕК НА КНОПКИ
+                if data.get('ui_elements') and len(data['ui_elements']) > 0:
+                    current_is_menu = True
+                    
+                new_is_menu = not current_is_menu
+                data['is_menu'] = new_is_menu
+                
+                if not new_is_menu:
+                    # Якщо робимо рівнем - безжально видаляємо кнопки, щоб не було конфліктів!
+                    data.pop('ui_elements', None) 
+                    if 'tilemap' not in data: data['tilemap'] = {}
+                    if 'tile_size' not in data: data['tile_size'] = 16
+                    if 'offgrid' not in data: data['offgrid'] = []
+                else:
+                    if 'ui_elements' not in data: data['ui_elements'] = []
+                
+                with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
+                
+                type_str = "МЕНЮ (UI)" if new_is_menu else "ІГРОВИЙ РІВЕНЬ"
+                QMessageBox.information(self, "Успіх", f"Карту '{map_name}' назавжди змінено на: {type_str}!\n\nПеремкни режим редактора (🎨 Menu / 🌍 Level), щоб її побачити.")
+                
+                self.update_map_list()
+                if self.map_combo.count() > 0:
+                    self.on_map_changed(self.map_combo.currentText())
+                else:
+                    self.viewport.set_current_tile(None, 0)
+            except Exception as e:
+                QMessageBox.critical(self, "Помилка", f"Не вдалося змінити тип: {e}")
+
     def on_build_game_clicked(self):
         self.on_save_clicked() 
         game_name, ok = QInputDialog.getText(self, "Build Game", "Як назвати гру? (тільки англійські літери):", text="MyAwesomeGame")
@@ -285,6 +402,8 @@ class MainWindow(QMainWindow):
         if current_map: self.on_map_changed(current_map)
 
     def closeEvent(self, event):
+        sys.stdout = self.original_stdout
+        sys.stderr = self.original_stderr
         self.on_save_clicked()
         event.accept()
 
@@ -300,6 +419,11 @@ class MainWindow(QMainWindow):
                 with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     is_menu_file = data.get('is_menu', False)
+                    
+                    # ПРИМУСОВИЙ ЧЕК НА КНОПКИ
+                    if data.get('ui_elements') and len(data['ui_elements']) > 0:
+                        is_menu_file = True
+                        
                     if is_menu_mode and is_menu_file: valid_maps.append(f_name)
                     elif not is_menu_mode and not is_menu_file: valid_maps.append(f_name)
             except: pass
@@ -328,13 +452,22 @@ class MainWindow(QMainWindow):
             path = f'data/maps/{map_name}'
             try:
                 with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
-                if data.get('is_menu', False):
+                
+                is_menu = data.get('is_menu', False)
+                
+                # ПРИМУСОВИЙ ЧЕК НА КНОПКИ
+                if data.get('ui_elements') and len(data['ui_elements']) > 0:
+                    is_menu = True
+                
+                if is_menu:
                     self.viewport.set_mode("MENU_EDITOR")
                     self.viewport.menu_editor.load(path)
+                    self.viewport.menu_editor.bg_music = data.get('bg_music', None)
                     bg_path = getattr(self.viewport.menu_editor, 'bg_path', None)
+                    bg_music = getattr(self.viewport.menu_editor, 'bg_music', None)
                     if hasattr(self, 'prop_current_bg_label'):
                         self.prop_current_bg_label.setText(f"Active BG: {bg_path if bg_path else 'None'}")
-                        self.prop_current_music_label.setText(f"Active Music: None (UI Mode)")
+                        self.prop_current_music_label.setText(f"Active Music: {bg_music if bg_music else 'None'}")
                 else:
                     self.viewport.set_mode("EDITOR")
                     self.viewport.editor.tilemap.load(path)
@@ -408,7 +541,9 @@ class MainWindow(QMainWindow):
                 self.sfx_title_label.setVisible(False)
     
     def clear_background(self):
-        if self.viewport.mode == "MENU_EDITOR": self.viewport.menu_editor.bg_path = None
+        if self.viewport.mode == "MENU_EDITOR": 
+            self.viewport.menu_editor.bg_path = None
+            self.viewport.menu_editor.bg_music = None 
         else:
             self.viewport.editor.tilemap.bg_path = None
             self.viewport.editor.tilemap.bg_music = None
@@ -420,7 +555,7 @@ class MainWindow(QMainWindow):
         is_player = (preset == "Player")
         is_enemy = (preset == "Enemy")
         is_npc = (preset == "Friendly NPC")
-        is_collectible = (preset == "Collectible") # ФІКС: Змінна для монет
+        is_collectible = (preset == "Collectible")
         is_entity = is_player or is_enemy or is_npc or is_collectible
         
         self.prop_anim_idle_label.setVisible(is_entity)
@@ -476,6 +611,9 @@ class MainWindow(QMainWindow):
             self.prop_col_type_combo.setVisible(is_collectible)
             self.prop_col_value_label.setVisible(is_collectible)
             self.prop_col_value_input.setVisible(is_collectible)
+            if hasattr(self, 'prop_col_ui_icon_input'):
+                self.prop_col_ui_icon_label.setVisible(is_collectible)
+                self.prop_col_ui_icon_input.setVisible(is_collectible)
             
         if hasattr(self, 'sfx_container'):
             is_spawner = (self.prop_type_combo.currentText() == "Spawner")
@@ -510,7 +648,9 @@ class MainWindow(QMainWindow):
                       self.prop_sfx_dash_input, self.prop_sfx_shoot_input,
                       self.prop_anim_die_input]
             if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
-            if hasattr(self, 'prop_col_type_combo'): widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
+            if hasattr(self, 'prop_col_type_combo'): 
+                widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
+                if hasattr(self, 'prop_col_ui_icon_input'): widgets.append(self.prop_col_ui_icon_input)
             for w in widgets: w.blockSignals(True)
             
             self.prop_type_combo.setCurrentText("Static Blocks")
@@ -533,6 +673,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'prop_col_type_combo'):
                 self.prop_col_type_combo.setCurrentText("coin")
                 self.prop_col_value_input.setValue(1)
+                if hasattr(self, 'prop_col_ui_icon_input'): self.prop_col_ui_icon_input.setText("")
             self.prop_collision_cb.setChecked(True)
             self.prop_visible_cb.setChecked(True)
             self.prop_walk_cb.setChecked(False)
@@ -556,7 +697,7 @@ class MainWindow(QMainWindow):
         
         if self.viewport.mode == "MENU_EDITOR":
             bg_path = getattr(self.viewport.menu_editor, 'bg_path', None)
-            bg_music = None
+            bg_music = getattr(self.viewport.menu_editor, 'bg_music', None) 
         else:
             bg_path = getattr(self.viewport.editor.tilemap, 'bg_path', None)
             bg_music = getattr(self.viewport.editor.tilemap, 'bg_music', None)
@@ -579,7 +720,9 @@ class MainWindow(QMainWindow):
         
         if hasattr(self, 'prop_ui_text_input'): widgets.extend([self.prop_ui_text_input, self.prop_ui_action_combo, self.prop_ui_target_input])
         if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
-        if hasattr(self, 'prop_col_type_combo'): widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
+        if hasattr(self, 'prop_col_type_combo'): 
+            widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
+            if hasattr(self, 'prop_col_ui_icon_input'): widgets.append(self.prop_col_ui_icon_input)
             
         for w in widgets: w.blockSignals(True)
         
@@ -611,6 +754,7 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'prop_col_type_combo'):
                     self.prop_col_type_combo.setCurrentText(data.get('col_type', 'coin'))
                     self.prop_col_value_input.setValue(data.get('col_value', 1))
+                    if hasattr(self, 'prop_col_ui_icon_input'): self.prop_col_ui_icon_input.setText(data.get('ui_icon', ''))
                 
                 sfx_hit = data.get('sfx_hit', 'hit.wav')
                 sfx_jump = data.get('sfx_jump', 'jump.wav')
@@ -659,6 +803,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'prop_col_type_combo'):
                 self.prop_col_type_combo.setCurrentText("coin")
                 self.prop_col_value_input.setValue(1)
+                if hasattr(self, 'prop_col_ui_icon_input'): self.prop_col_ui_icon_input.setText("")
             self.prop_sfx_hit_slider.setValue(60)
             self.prop_sfx_jump_slider.setValue(60)
             self.prop_sfx_dash_slider.setValue(60)
@@ -724,6 +869,7 @@ class MainWindow(QMainWindow):
             'dialogue_sound': self.prop_dialogue_sound_input.text() if hasattr(self, 'prop_dialogue_sound_input') else 'talk.wav',
             'col_type': self.prop_col_type_combo.currentText() if hasattr(self, 'prop_col_type_combo') else 'coin',
             'col_value': self.prop_col_value_input.value() if hasattr(self, 'prop_col_value_input') else 1,
+            'ui_icon': self.prop_col_ui_icon_input.text() if hasattr(self, 'prop_col_ui_icon_input') else '',
             'sfx_hit': self.prop_sfx_hit_input.text() if hasattr(self, 'prop_sfx_hit_input') else 'hit.wav',
             'sfx_jump': self.prop_sfx_jump_input.text() if hasattr(self, 'prop_sfx_jump_input') else 'jump.wav',
             'sfx_dash': self.prop_sfx_dash_input.text() if hasattr(self, 'prop_sfx_dash_input') else 'dash.wav',
@@ -816,7 +962,10 @@ class MainWindow(QMainWindow):
             if len(parts) == 1: self.btn_add_audio.show()
             elif len(parts) == 2: 
                 if self.prop_type_combo.currentText() == "Background":
-                    self.viewport.editor.tilemap.bg_music = parts[1]
+                    if self.viewport.mode == "MENU_EDITOR":
+                        self.viewport.menu_editor.bg_music = parts[1]
+                    else:
+                        self.viewport.editor.tilemap.bg_music = parts[1]
                     self.prop_current_music_label.setText(f"Active Music: {parts[1]}")
                     self.properties_panel.show() 
             
@@ -854,6 +1003,15 @@ class MainWindow(QMainWindow):
                     with open(path, 'r', encoding='utf-8') as f: new_data = json.load(f)
                     if 'level_order' in existing_data: new_data['level_order'] = existing_data['level_order']
                     if 'ignore_in_progression' in existing_data: new_data['ignore_in_progression'] = existing_data['ignore_in_progression']
+                    
+                    if self.viewport.mode == "MENU_EDITOR":
+                        new_data['is_menu'] = True
+                        new_data['bg_music'] = getattr(self.viewport.menu_editor, 'bg_music', None)
+                    else:
+                        new_data['is_menu'] = False
+                        if 'bg_music' not in new_data:
+                            new_data['bg_music'] = getattr(self.viewport.editor.tilemap, 'bg_music', None)
+                        
                     with open(path, 'w', encoding='utf-8') as f: json.dump(new_data, f, ensure_ascii=False, indent=4)
                 except: pass
 
@@ -950,6 +1108,12 @@ class MainWindow(QMainWindow):
                 if self.viewport.current_tile_group == folder_name and self.viewport.current_tile_variant in mapping:
                     self.viewport.set_current_tile(folder_name, mapping[self.viewport.current_tile_variant])
                 self.assets[folder_name] = load_images('tiles/' + folder_name)
+            elif parts[0] == "Entities":
+                from scripts.utils import Animation
+                ent_name = parts[1]
+                anim_name = parts[2]
+                img_dur = 4 if anim_name in ['run', 'walk', 'slide'] else 6
+                self.assets[f'{ent_name}/{anim_name}'] = Animation(load_images(f'entities/{ent_name}/{anim_name}'), img_dur=img_dur)
             self.on_folder_clicked(index)
 
     def on_add_audio_clicked(self):

@@ -21,10 +21,11 @@
             ],
             "text": "main menu",
             "action": "load_map",
-            "target": "menu.json"
+            "target": "mainmenu.json"
         }
     ],
     "bg_path": null,
-    "level_order": 6,
-    "ignore_in_progression": true
+    "level_order": 7,
+    "ignore_in_progression": true,
+    "bg_music": null
 }

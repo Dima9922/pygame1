@@ -1,0 +1,42 @@
+{
+    "is_menu": true,
+    "ui_elements": [
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                241.6470588235294,
+                67.5187165775401
+            ],
+            "text": "Play",
+            "action": "load_map",
+            "target": "menu.json"
+        },
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                240.68449197860963,
+                167.62566844919783
+            ],
+            "text": "Settings",
+            "action": "load_map",
+            "target": "Settings.json"
+        },
+        {
+            "type": "buttonss",
+            "variant": 0,
+            "pos": [
+                238.75935828877004,
+                266.7700534759358
+            ],
+            "text": "Exit",
+            "action": "quit_game",
+            "target": "1.json"
+        }
+    ],
+    "bg_path": "bg/0",
+    "level_order": 0,
+    "ignore_in_progression": true,
+    "bg_music": null
+}

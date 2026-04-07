@@ -1,7 +1,7 @@
 import os
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QFrame, 
                              QSplitter, QPushButton, QLabel, QListWidget, QScrollArea,
-                             QComboBox, QCheckBox, QDoubleSpinBox, QSpinBox, QLineEdit, QSlider)
+                             QComboBox, QCheckBox, QDoubleSpinBox, QSpinBox, QLineEdit, QSlider, QTextEdit)
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from ui.pygame_widget import NumiViewport 
@@ -27,6 +27,14 @@ def setup_ui(main_window, assets):
     main_window.btn_new_map = QPushButton("+ New Map")
     main_window.btn_delete_map = QPushButton("❌ Delete Map")
     main_window.btn_delete_map.setStyleSheet("color: #d73a49;")
+    main_window.btn_change_type = QPushButton("🔄 Change Type") 
+    main_window.btn_change_type.setToolTip("Змінити тип карти (Меню <-> Ігровий Рівень)")
+    
+    # === НОВА КНОПКА ===
+    main_window.btn_set_pause = QPushButton("⏸ Set as Pause")
+    main_window.btn_set_pause.setToolTip("Призначити поточну карту як Меню Паузи")
+    # ===================
+
     main_window.btn_save = QPushButton("Save Map")
     main_window.btn_play = QPushButton("▶ PLAY")
     
@@ -34,6 +42,8 @@ def setup_ui(main_window, assets):
     main_window.toolbar_layout.addWidget(main_window.map_combo)
     main_window.toolbar_layout.addWidget(main_window.btn_new_map)
     main_window.toolbar_layout.addWidget(main_window.btn_delete_map)
+    main_window.toolbar_layout.addWidget(main_window.btn_change_type)
+    main_window.toolbar_layout.addWidget(main_window.btn_set_pause) # ДОДАЛИ СЮДИ
     main_window.toolbar_layout.addStretch()
     main_window.toolbar_layout.addWidget(main_window.btn_save)
     main_window.toolbar_layout.addWidget(main_window.btn_play)
@@ -172,7 +182,7 @@ def setup_ui(main_window, assets):
     
     main_window.prop_preset_label = QLabel("Entity Preset:")
     main_window.prop_preset_combo = QComboBox()
-    main_window.prop_preset_combo.addItems(["Player", "Enemy", "Friendly NPC", "Collectible"]) # ФІКС ТУТ
+    main_window.prop_preset_combo.addItems(["Player", "Enemy", "Friendly NPC", "Collectible"])
     main_window.prop_spawner_layout.addWidget(main_window.prop_preset_label)
     main_window.prop_spawner_layout.addWidget(main_window.prop_preset_combo)
 
@@ -245,15 +255,12 @@ def setup_ui(main_window, assets):
     main_window.prop_dialogue_sound_label = QLabel("Talk Sound File:")
     main_window.prop_dialogue_sound_input = QLineEdit("talk.wav")
 
-   # --- НОВІ ПОЛЯ ДЛЯ ПРЕДМЕТІВ ---
     main_window.prop_col_type_label = QLabel("Collectible Type:")
     main_window.prop_col_type_combo = QComboBox()
     main_window.prop_col_type_combo.addItems(["coin", "health", "key"])
     main_window.prop_col_value_label = QLabel("Value / Heal Amount:")
     main_window.prop_col_value_input = QSpinBox()
     main_window.prop_col_value_input.setRange(1, 999)
-    
-    # === НОВЕ ПОЛЕ ДЛЯ ІКОНКИ ===
     main_window.prop_col_ui_icon_label = QLabel("UI Icon Path (Optional):")
     main_window.prop_col_ui_icon_input = QLineEdit()
     main_window.prop_col_ui_icon_input.setPlaceholderText("Напр: coins/idle або ui/icon.png")
@@ -290,7 +297,7 @@ def setup_ui(main_window, assets):
     main_window.prop_ui_text_input = QLineEdit()
     main_window.prop_ui_action_label = QLabel("On Click Action:")
     main_window.prop_ui_action_combo = QComboBox()
-    main_window.prop_ui_action_combo.addItems(["load_map", "open_url", "quit_game", "resume_game"])
+    main_window.prop_ui_action_combo.addItems(["none", "load_map", "open_url", "quit_game", "resume_game", "toggle_music", "toggle_sfx", "cycle_resolution", "toggle_fullscreen"])
     main_window.prop_ui_target_label = QLabel("Target (Map/URL):")
     main_window.prop_ui_target_input = QComboBox()
     main_window.prop_ui_target_input.setEditable(True)
@@ -364,7 +371,27 @@ def setup_ui(main_window, assets):
     main_window.horizontal_splitter.addWidget(main_window.center_container)
     main_window.horizontal_splitter.addWidget(main_window.properties_panel)
     main_window.horizontal_splitter.setStretchFactor(1, 1)
-    main_window.main_layout.addWidget(main_window.horizontal_splitter)
+    
+    main_window.main_vertical_splitter = QSplitter(Qt.Vertical)
+    main_window.main_vertical_splitter.addWidget(main_window.horizontal_splitter)
+    
+    main_window.console_container = QWidget()
+    main_window.console_layout = QVBoxLayout(main_window.console_container)
+    main_window.console_layout.setContentsMargins(0, 0, 0, 0)
+    
+    main_window.console_header = QLabel(" 💻 Console Output (Логи та Помилки)")
+    main_window.console_header.setStyleSheet("background-color: #1e1e1e; color: #fbc02d; font-weight: bold; padding: 4px; border-top: 2px solid #333;")
+    main_window.console_layout.addWidget(main_window.console_header)
+    
+    main_window.console_output = QTextEdit()
+    main_window.console_output.setReadOnly(True)
+    main_window.console_output.setStyleSheet("background-color: #0d0d0d; color: #cccccc; font-family: Consolas, monospace; font-size: 13px; border: none; padding: 5px;")
+    main_window.console_layout.addWidget(main_window.console_output)
+    
+    main_window.main_vertical_splitter.addWidget(main_window.console_container)
+    main_window.main_vertical_splitter.setSizes([600, 100]) 
+    
+    main_window.main_layout.addWidget(main_window.main_vertical_splitter)
 
     try:
         with open("ui/styles.qss", "r", encoding="utf-8") as f:

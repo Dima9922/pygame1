@@ -45,13 +45,13 @@ class NumiViewport(QWidget):
             Qt.Key_Control: pygame.K_LCTRL,
             Qt.Key_W: pygame.K_w, Qt.Key_A: pygame.K_a,
             Qt.Key_S: pygame.K_s, Qt.Key_D: pygame.K_d, Qt.Key_X: pygame.K_x,
-            Qt.Key_E: pygame.K_e, # <--- Англійська E
+            Qt.Key_E: pygame.K_e, 
             Qt.Key_G: pygame.K_g, Qt.Key_T: pygame.K_t, Qt.Key_O: pygame.K_o,
             1062: pygame.K_w, 1060: pygame.K_a, 
             1030: pygame.K_s, 1042: pygame.K_d, 
             1063: pygame.K_x,                   
             1055: pygame.K_g, 1045: pygame.K_t, 1065: pygame.K_o,
-            1059: pygame.K_e  # <--- Українська У (на тій самій клавіші)
+            1059: pygame.K_e  
         }
 
     def set_current_tile(self, group, variant):
@@ -68,19 +68,34 @@ class NumiViewport(QWidget):
                 
         elif new_mode == "PAUSE":
             self.pause_ui_elements = []
-            pause_path = 'data/maps/pause.json'
+            
+            pause_map_name = 'pause.json'
+            if os.path.exists('data/config.json'):
+                try:
+                    with open('data/config.json', 'r', encoding='utf-8') as f:
+                        conf = json.load(f)
+                        pause_map_name = conf.get('pause_map', 'pause.json')
+                except: pass
+                
+            pause_path = f'data/maps/{pause_map_name}'
             if os.path.exists(pause_path):
                 try:
                     with open(pause_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
-                        self.pause_ui_elements = data.get('ui_elements', [])
+                        
+                        is_pause_menu = data.get('is_menu', False)
+                        # === ПРИМУСОВИЙ ЧЕК НА МЕНЮ ===
+                        if data.get('ui_elements') and len(data['ui_elements']) > 0:
+                            is_pause_menu = True
+                        # ==============================
+                        
+                        if is_pause_menu:
+                            self.pause_ui_elements = data.get('ui_elements', [])
                 except: pass
-            
-        elif new_mode in ["EDITOR", "MENU_EDITOR"]:
-            self.game = None
-            self.pause_ui_elements = []
-            
+        
+        # === НАЙГОЛОВНІШИЙ ЗАГУБЛЕНИЙ РЯДОК ===
         self.mode = new_mode
+        # =======================================
             
     def mouseMoveEvent(self, event):
         self.mpos = (event.position().x(), event.position().y())
@@ -188,18 +203,17 @@ class NumiViewport(QWidget):
                                 img = self.assets[el['type']][el['variant']]
                                 rect = pygame.Rect(el['pos'][0], el['pos'][1], img.get_width(), img.get_height())
                                 if rect.collidepoint((cmx, cmy)):
-                                    action = el.get('action', 'load_map') # Fallback
+                                    action = el.get('action', 'load_map') 
                                     
                                     if action == 'resume_game':
                                         self.set_mode("PLAY")
                                         
-                                    # ФІКС: Тепер завантажуємо мапу ПРЯМО В ГРІ, не вимикаючи режим PLAY
                                     elif action == 'load_map':
                                         target = el.get('target', 'menu.json')
                                         with open('data/maps/current_play.txt', 'w') as f:
                                             f.write(target)
                                         self.game.load_level(f"data/maps/{target}")
-                                        self.set_mode("PLAY") # Знімаємо паузу, бо ми тепер в іншому меню/рівні
+                                        self.set_mode("PLAY") 
                                         
                                     elif action == 'quit_game':
                                         self.timer.stop()

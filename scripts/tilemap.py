@@ -59,20 +59,28 @@ class Tilemap:
         f.close()
         
     def load(self, path):
-        f = open(path, 'r')
-        map_data = json.load(f)
-        f.close()
-        self.tilemap = map_data['tilemap']
-        self.tile_size = map_data['tile_size']
-        self.offgrid_tiles = map_data['offgrid']
-        self.bg_path = map_data.get('bg_path', None)
-        self.bg_music = map_data.get('bg_music', None)
+        # === ФІКС ФАНТОМНИХ БЛОКІВ ===
+        # Спочатку ПОВНІСТЮ очищаємо пам'ять карти!
+        self.tilemap = {}
+        self.offgrid_tiles = []
+        self.bg_path = None
+        self.bg_music = None
+        
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                map_data = json.load(f)
+                
+            self.tilemap = map_data.get('tilemap', {})
+            self.tile_size = map_data.get('tile_size', 16)
+            self.offgrid_tiles = map_data.get('offgrid', [])
+            self.bg_path = map_data.get('bg_path', None)
+            self.bg_music = map_data.get('bg_music', None)
+        except Exception:
+            pass # Якщо це меню, воно просто залишить карту порожньою (без помилок)
         
     def solid_check(self, pos):
-        # Безпечне отримання властивостей
         properties = getattr(self.game, 'tile_properties', {})
         
-        # 1. Перевірка на сітці
         tile_loc = str(int(pos[0] // self.tile_size)) + ';' + str(int(pos[1] // self.tile_size))
         if tile_loc in self.tilemap:
             tile = self.tilemap[tile_loc]
@@ -80,7 +88,6 @@ class Tilemap:
             if props.get('type') in ['Static Blocks', 'Kill Zone'] and props.get('collision', True): 
                 return tile
                 
-        # 2. Перевірка поза сіткою (off-grid)
         for tile in self.offgrid_tiles:
             props = properties.get(tile['type'], {})
             if props.get('type') in ['Static Blocks', 'Kill Zone'] and props.get('collision', True): 
@@ -99,7 +106,6 @@ class Tilemap:
             tile = self.tilemap[loc]
             props = properties.get(tile['type'], {})
             if props.get('type') == 'Spawner':
-                # Якщо спавнер без колізії, він видаляється з карти і стає об'єктом
                 if props.get('collision', False):
                     spawner_tile = tile.copy() 
                 else:
@@ -119,13 +125,11 @@ class Tilemap:
         rects = []
         properties = getattr(self.game, 'tile_properties', {})
         
-        # Блоки на сітці
         for tile in self.tiles_around(pos):
             props = properties.get(tile['type'], {})
             if props.get('type') in ['Static Blocks', 'Kill Zone'] and props.get('collision', True): 
                 rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size))
                 
-        # Блоки поза сіткою
         for tile in self.offgrid_tiles:
             props = properties.get(tile['type'], {})
             if props.get('type') in ['Static Blocks', 'Kill Zone'] and props.get('collision', True): 
@@ -137,7 +141,6 @@ class Tilemap:
         return rects
         
     def check_kill_zones(self, rect):
-        """Перевіряє дотик до Kill Zone"""
         properties = getattr(self.game, 'tile_properties', {})
         
         for tile in self.tiles_around((rect.centerx, rect.centery)):
@@ -158,7 +161,6 @@ class Tilemap:
         return False
     
     def check_level_exits(self, rect):
-        """Перевіряє дотик гравця до блоку фінішу (Level Exit)"""
         properties = getattr(self.game, 'tile_properties', {})
         
         for tile in self.tiles_around((rect.centerx, rect.centery)):
@@ -192,13 +194,11 @@ class Tilemap:
                 tile['variant'] = AUTOTILE_MAP[neighbors]
 
     def check_line_of_sight(self, pos1, pos2):
-        """Пускає промінь між двома точками і перевіряє, чи є між ними блоки з колізією"""
         min_x, max_x = min(pos1[0], pos2[0]), max(pos1[0], pos2[0])
         min_y, max_y = min(pos1[1], pos2[1]), max(pos1[1], pos2[1])
         
         properties = getattr(self.game, 'tile_properties', {})
         
-        # Перевіряємо блоки на сітці
         start_tx = int(min_x // self.tile_size)
         end_tx = int(max_x // self.tile_size)
         start_ty = int(min_y // self.tile_size)
@@ -212,25 +212,22 @@ class Tilemap:
                     props = properties.get(tile['type'], {})
                     if props.get('type') in ['Static Blocks', 'Kill Zone'] and props.get('collision', True):
                         rect = pygame.Rect(x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size)
-                        if rect.clipline(pos1, pos2): # Якщо лінія перетинає прямокутник
-                            return False # Лінія зору перекрита
+                        if rect.clipline(pos1, pos2): 
+                            return False 
                             
-        # Перевіряємо об'єкти поза сіткою
         for tile in self.offgrid_tiles:
             props = properties.get(tile['type'], {})
             if props.get('type') in ['Static Blocks', 'Kill Zone'] and props.get('collision', True):
                 if tile['type'] in self.game.assets and isinstance(self.game.assets[tile['type']], list) and tile['variant'] < len(self.game.assets[tile['type']]):
                     img = self.game.assets[tile['type']][tile['variant']]
                     rect = pygame.Rect(tile['pos'][0], tile['pos'][1], img.get_width(), img.get_height())
-                    # Перевіряємо лише ті, що лежать між точками
                     if rect.right >= min_x and rect.left <= max_x and rect.bottom >= min_y and rect.top <= max_y:
                         if rect.clipline(pos1, pos2):
-                            return False # Лінія зору перекрита
+                            return False 
                             
         return True
     
     def render(self, surf, offset=(0, 0), render_hidden=False):
-        # Виправлення AttributeError: використовуємо getattr для безпечного доступу
         properties = getattr(self.game, 'tile_properties', {})
         
         for tile in self.offgrid_tiles:

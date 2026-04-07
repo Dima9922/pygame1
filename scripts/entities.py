@@ -105,7 +105,6 @@ class Enemy(PhysicsEntity):
                 angle = random.random() * math.pi * 2
                 speed = random.random() * 5
                 self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
-                # ФІКС: frame='random'
                 self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame='random'))
             return True
             
@@ -168,7 +167,6 @@ class Enemy(PhysicsEntity):
                     angle = random.random() * math.pi * 2
                     speed = random.random() * 5
                     self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
-                    # ФІКС: frame='random'
                     self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame='random'))
                 self.game.sparks.append(Spark(self.rect().center, 0, 5 + random.random()))
                 self.game.sparks.append(Spark(self.rect().center, math.pi, 5 + random.random()))
@@ -217,7 +215,6 @@ class Player(PhysicsEntity):
                     angle = random.random() * math.pi * 2
                     speed = random.random() * 5
                     self.game.sparks.append(Spark(self.rect().center, angle, 2 + random.random()))
-                    # ФІКС: frame='random'
                     self.game.particles.append(Particle(self.game, 'particle/particle', self.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame='random'))
             self.game.dead += 1
             
@@ -258,7 +255,6 @@ class Player(PhysicsEntity):
                 angle = random.random() * math.pi * 2
                 speed = random.random() * 0.5 + 0.5
                 pvelocity = [math.cos(angle) * speed, math.sin(angle) * speed]
-                # ФІКС: frame='random'
                 self.game.particles.append(Particle(self.game, dash_p_type, self.rect().center, velocity=pvelocity, frame='random'))
         if self.dashing > 0:
             self.dashing = max(0, self.dashing - 1)
@@ -269,7 +265,6 @@ class Player(PhysicsEntity):
             if abs(self.dashing) == 51:
                 self.velocity[0] *= 0.1
             pvelocity = [abs(self.dashing) / self.dashing * random.random() * 3, 0]
-            # ФІКС: frame='random'
             self.game.particles.append(Particle(self.game, dash_p_type, self.rect().center, velocity=pvelocity, frame='random'))
                 
         if self.velocity[0] > 0:
@@ -374,7 +369,6 @@ class NPC(PhysicsEntity):
             elif random.random() < 0.01:
                 self.walking = random.randint(30, 120)
         
-        # Перевіряємо відстань до гравця (якщо ближче ніж 40 пікселів - можна говорити)
         dis = math.hypot(self.game.player.pos[0] - self.pos[0], self.game.player.pos[1] - self.pos[1])
         self.interactable = (dis < 40)
         
@@ -387,33 +381,26 @@ class NPC(PhysicsEntity):
             
     def render(self, surf, offset=(0, 0)):
         super().render(surf, offset=offset)
-        # Малюємо підказку [E] над головою, якщо гравець поруч і діалог ще не відкритий
         if getattr(self, 'interactable', False) and not getattr(self.game, 'is_dialogue_active', False):
             text_surf = self.game.font.render("[E]", True, (255, 255, 255))
             shadow = self.game.font.render("[E]", True, (0, 0, 0))
             surf.blit(shadow, (self.rect().centerx - offset[0] - text_surf.get_width()//2 + 1, self.rect().top - offset[1] - 15 + 1))
             surf.blit(text_surf, (self.rect().centerx - offset[0] - text_surf.get_width()//2, self.rect().top - offset[1] - 15))
 
+# === ОНОВЛЕНИЙ КЛАС ДЛЯ МОНЕТОК ===
 class Collectible(PhysicsEntity):
     def __init__(self, game, pos, size, anim_paths=None, c_type='coin', value=1, spawner_type=''):
-        # Успадковуємося від базового класу (як Гравець чи NPC)
         super().__init__(game, 'collectible', pos, size, anim_paths)
-        
         self.type = c_type
         self.value = value
         self.spawner_type = spawner_type
-        
-        # PhysicsEntity сам знайде картинку з anim_paths['idle']
         self.set_action('idle')
         
     def update(self, tilemap=None, movement=(0,0)):
-        # ПЕРЕВИЗНАЧАЄМО update, щоб вимкнути гравітацію та перевірку стін.
-        # Монетці потрібна ТІЛЬКИ зміна кадрів анімації.
         if hasattr(self, 'animation'):
             self.animation.update()
             
     def render(self, surf, offset=(0, 0)):
-        # Малюємо ідеально по центру клітинки 16x16
         if hasattr(self, 'animation'):
             img = self.animation.img()
             draw_x = self.pos[0] + (16 - img.get_width()) // 2 - offset[0]

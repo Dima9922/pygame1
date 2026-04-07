@@ -25,6 +25,25 @@ class Game:
         self.dialogue_index = 0
         self.active_npc = None
         
+        # --- НАЛАШТУВАННЯ ТА СИСТЕМА КОНФІГІВ ---
+        self.resolutions = [(640, 360), (960, 540), (1280, 720), (1600, 900), (1920, 1080)]
+        self.config = {
+            "music": True, 
+            "sfx": True, 
+            "resolution_index": 2, 
+            "fullscreen": False, 
+            "pause_map": "pause.json"
+        }
+        
+        config_path = 'data/config.json'
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    self.config.update(json.load(f))
+            except: pass
+        else:
+            self.save_config()
+        
         # --- ІНВЕНТАР ТА ЗБЕРЕЖЕННЯ ---
         self.inventory = {'coin': 0, 'key': 0}
         self.level_start_inventory = {'coin': 0, 'key': 0} 
@@ -85,7 +104,7 @@ class Game:
         try:
             self.ambience = pygame.mixer.Sound('data/sfx/ambience.wav')
             self.ambience.set_volume(0.2)
-            self.ambience.play(-1)
+            if self.config['music']: self.ambience.play(-1)
         except: pass
         
         self.clouds = Clouds(self.assets['clouds'], count = 16)
@@ -129,6 +148,20 @@ class Game:
             self.current_map_name = self.level_list[0]
             self.load_level(f"data/maps/{self.current_map_name}")
 
+    def save_config(self):
+        os.makedirs('data', exist_ok=True)
+        try:
+            with open('data/config.json', 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=4)
+        except: pass
+
+    def apply_display_mode(self):
+        if 'PySide6' not in sys.modules: 
+            res = self.resolutions[self.config['resolution_index']]
+            flags = pygame.FULLSCREEN | pygame.SCALED if self.config['fullscreen'] else pygame.SCALED
+            try: pygame.display.set_mode(res, flags)
+            except: pygame.display.set_mode(res)
+
     def resize_display(self, new_w, new_h):
         self.display = pygame.Surface((new_w, new_h), pygame.SRCALPHA)
         self.display_2 = pygame.Surface((new_w, new_h))
@@ -156,6 +189,8 @@ class Game:
 
     def play_sound(self, key, fallback_key=None, entity_type=None):
         if not key or not pygame.mixer.get_init(): return
+        if not self.config.get('sfx', True): return 
+        
         vol_percent = 60
         if entity_type and entity_type in self.tile_properties:
             vol_percent = self.tile_properties[entity_type].get('sfx_volumes', {}).get(key, 60)
@@ -202,7 +237,13 @@ class Game:
             with open(map_path, 'r', encoding='utf-8') as f:
                 map_data = json.load(f)
                 
-                if map_data.get('is_menu', False):
+                is_menu = map_data.get('is_menu', False)
+                # === ПРИМУСОВИЙ ЧЕК НА МЕНЮ ===
+                if map_data.get('ui_elements') and len(map_data['ui_elements']) > 0:
+                    is_menu = True
+                # ==============================
+                
+                if is_menu:
                     self.is_menu_mode = True
                     self.ui_elements = map_data.get('ui_elements', [])
                     bg_path = map_data.get('bg_path')
@@ -210,7 +251,17 @@ class Game:
                         folder, variant = bg_path.split('/')
                         if folder in self.assets and int(variant) < len(self.assets[folder]):
                             self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], (640, 360))
-                    pygame.mixer.music.stop() 
+                    
+                    pygame.mixer.music.stop()
+                    level_music = map_data.get('bg_music', None)
+                    if level_music and self.config.get('music', True):
+                        path = f"data/sfx/{level_music}"
+                        if os.path.exists(path):
+                            try:
+                                pygame.mixer.music.load(path)
+                                pygame.mixer.music.set_volume(0.5)
+                                pygame.mixer.music.play(-1)
+                            except: pass
                     return 
         except FileNotFoundError: pass
 
@@ -219,7 +270,7 @@ class Game:
             
         pygame.mixer.music.stop()
         level_music = getattr(self.tilemap, 'bg_music', None)
-        if level_music:
+        if level_music and self.config.get('music', True):
             path = f"data/sfx/{level_music}"
             if os.path.exists(path):
                 try:
@@ -296,7 +347,7 @@ class Game:
             elif preset == "Collectible":
                 self.collectibles.append(Collectible(
                     self, spawner['pos'], (16, 16),
-                    anim_paths=anim_paths, # <--- ФІКС ТУТ (прибрали ['idle'])
+                    anim_paths=anim_paths,
                     c_type=props.get('col_type', 'coin'),
                     value=props.get('col_value', 1),
                     spawner_type=folder
@@ -322,14 +373,14 @@ class Game:
                             rect = pygame.Rect(el['pos'][0], el['pos'][1], img.get_width(), img.get_height())
                             if rect.collidepoint((cmx, cmy)):
                                 action = el.get('action', 'load_map')
-                                if action == 'load_map':
+                                
+                                if action == 'none':
+                                    continue 
+                                elif action == 'load_map':
                                     target = el.get('target', '1.json')
                                     with open('data/maps/current_play.txt', 'w') as f: f.write(target)
-                                    
-                                    # ОБНУЛЯЄМО МОНЕТИ ПРИ НОВІЙ ГРІ
                                     self.inventory = {'coin': 0, 'key': 0}
                                     self.level_start_inventory = {'coin': 0, 'key': 0}
-                                    
                                     self.load_level(f"data/maps/{target}")
                                     return 
                                 elif action == 'quit_game':
@@ -345,6 +396,38 @@ class Game:
                                     import webbrowser
                                     webbrowser.open(el.get('target', 'http://google.com'))
                                     break 
+                                elif action == 'toggle_music':
+                                    self.config['music'] = not self.config['music']
+                                    if not self.config['music']: pygame.mixer.music.stop()
+                                    else:
+                                        level_music = getattr(self.tilemap, 'bg_music', None)
+                                        if getattr(self, 'is_menu_mode', False):
+                                            try:
+                                                with open(f"data/maps/{self.current_map_name}", 'r', encoding='utf-8') as f:
+                                                    menu_data = json.load(f)
+                                                    level_music = menu_data.get('bg_music', None)
+                                            except: pass
+                                        if level_music:
+                                            try: 
+                                                pygame.mixer.music.load(f"data/sfx/{level_music}")
+                                                pygame.mixer.music.play(-1)
+                                            except: pass
+                                    self.save_config()
+                                    break
+                                elif action == 'toggle_sfx':
+                                    self.config['sfx'] = not self.config['sfx']
+                                    self.save_config()
+                                    break
+                                elif action == 'cycle_resolution':
+                                    self.config['resolution_index'] = (self.config['resolution_index'] + 1) % len(self.resolutions)
+                                    self.apply_display_mode()
+                                    self.save_config()
+                                    break
+                                elif action == 'toggle_fullscreen':
+                                    self.config['fullscreen'] = not self.config['fullscreen']
+                                    self.apply_display_mode()
+                                    self.save_config()
+                                    break
             return
 
         if self.is_dialogue_active:
@@ -445,7 +528,7 @@ class Game:
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
                                 if fx_key:
-                                    self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
+                                    self.particles.append(Particle(self.game, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     
         for spark in self.sparks.copy():
@@ -455,6 +538,10 @@ class Game:
 
         for event in events:
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    if not self.is_menu_mode:
+                        self.is_paused = not self.is_paused
+                        
                 if event.key in [pygame.K_LEFT, pygame.K_a]: self.movement[0] = True
                 if event.key in [pygame.K_RIGHT, pygame.K_d]: self.movement[1] = True
                 if event.key in [pygame.K_UP, pygame.K_w]: self.player.jump()
@@ -505,12 +592,21 @@ class Game:
                     img = self.assets[el['type']][el['variant']]
                     rect = pygame.Rect(el['pos'][0], el['pos'][1], img.get_width(), img.get_height())
                     
-                    if rect.collidepoint((cmx, cmy)):
+                    if el.get('action', 'none') != 'none' and rect.collidepoint((cmx, cmy)):
                         pygame.draw.rect(menu_surf, (255, 204, 0), rect.inflate(4, 4), 2, border_radius=4)
                     
                     menu_surf.blit(img, (el['pos'][0], el['pos'][1]))
                     
                     text = el.get('text', '')
+                    action = el.get('action', '')
+                    
+                    if action == 'toggle_music': text = f"{text}: {'ON' if self.config.get('music', True) else 'OFF'}"
+                    elif action == 'toggle_sfx': text = f"{text}: {'ON' if self.config.get('sfx', True) else 'OFF'}"
+                    elif action == 'toggle_fullscreen': text = f"{text}: {'ON' if self.config.get('fullscreen', False) else 'OFF'}"
+                    elif action == 'cycle_resolution': 
+                        res = self.resolutions[self.config.get('resolution_index', 2)]
+                        text = f"{text}: {res[0]}x{res[1]}"
+                        
                     if text:
                         text_surf = self.font.render(text, True, (255, 255, 255))
                         shadow_surf = self.font.render(text, True, (0, 0, 0))
@@ -574,30 +670,22 @@ class Game:
         
         for item_type, amount in self.inventory.items():
             icon = None
-            
-            # Шукаємо налаштування для цього типу предмета
             for spawner_name, props in self.tile_properties.items():
                 if props.get('preset') == 'Collectible' and props.get('col_type') == item_type:
-                    # 1. ПРІОРИТЕТ: Беремо іконку з нового поля UI Icon
                     ui_path = props.get('ui_icon', '')
                     if ui_path and ui_path in self.assets:
                         asset = self.assets[ui_path]
                         icon = asset.images[0] if hasattr(asset, 'images') else asset
-                    
-                    # 2. ФОЛБЕК: Якщо поле порожнє, беремо анімацію спокою
                     if icon is None:
                         anim_path = props.get('anim_idle')
                         if anim_path in self.assets:
                             asset = self.assets[anim_path]
                             icon = asset.images[0] if hasattr(asset, 'images') else asset
-                            
-                    # 3. КРАЙНІЙ ВИПАДОК: Беремо картинку самого спавнера
                     if icon is None and spawner_name in self.assets:
                         asset = self.assets[spawner_name]
                         icon = asset[0] if isinstance(asset, list) else asset
                     break
                     
-            # Малюємо, якщо знайшли хоча б якусь іконку
             if icon is not None and (amount > 0 or item_type == 'coin'):
                 icon_w = int(icon.get_width() * scale_x * 1.5)
                 icon_h = int(icon.get_height() * scale_x * 1.5)
@@ -618,9 +706,12 @@ class Game:
             surface.blit(overlay, (0, 0))
             
             pause_ui_elements = []
-            if os.path.exists('data/maps/pause.json'):
+            pause_map_name = self.config.get('pause_map', 'pause.json')
+            pause_path = f'data/maps/{pause_map_name}'
+            
+            if os.path.exists(pause_path):
                 try:
-                    with open('data/maps/pause.json', 'r', encoding='utf-8') as f:
+                    with open(pause_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                         if data.get('is_menu', False): pause_ui_elements = data.get('ui_elements', [])
                 except: pass
@@ -643,7 +734,10 @@ class Game:
                             rect = pygame.Rect(final_x, final_y, final_w, final_h)
                             if rect.collidepoint(mpos_virtual):
                                 action = el.get('action', 'resume_game')
-                                if action == 'resume_game': 
+                                
+                                if action == 'none':
+                                    continue
+                                elif action == 'resume_game': 
                                     self.is_paused = False
                                     break
                                 elif action == 'load_map':
@@ -661,6 +755,29 @@ class Game:
                                             return
                                     pygame.quit()
                                     sys.exit()
+                                elif action == 'toggle_music':
+                                    self.config['music'] = not self.config['music']
+                                    if not self.config['music']: pygame.mixer.music.stop()
+                                    else:
+                                        if getattr(self.tilemap, 'bg_music', None):
+                                            try: pygame.mixer.music.play(-1)
+                                            except: pass
+                                    self.save_config()
+                                    break
+                                elif action == 'toggle_sfx':
+                                    self.config['sfx'] = not self.config['sfx']
+                                    self.save_config()
+                                    break
+                                elif action == 'cycle_resolution':
+                                    self.config['resolution_index'] = (self.config['resolution_index'] + 1) % len(self.resolutions)
+                                    self.apply_display_mode()
+                                    self.save_config()
+                                    break
+                                elif action == 'toggle_fullscreen':
+                                    self.config['fullscreen'] = not self.config['fullscreen']
+                                    self.apply_display_mode()
+                                    self.save_config()
+                                    break
 
             for el in pause_ui_elements:
                 scale_y = win_h / 360
@@ -674,10 +791,22 @@ class Game:
                     final_w, final_h = int(orig_w * scale_x), int(orig_h * scale_y)
                     scaled_btn_img = pygame.transform.scale(orig_img, (final_w, final_h))
                     rect = pygame.Rect(final_x, final_y, final_w, final_h)
-                    if rect.collidepoint(mpos_virtual):
+                    
+                    if el.get('action', 'none') != 'none' and rect.collidepoint(mpos_virtual):
                         pygame.draw.rect(surface, (255, 204, 0), rect.inflate(4*scale_x, 4*scale_y), max(2, int(2*scale_x)), border_radius=int(4*scale_x))
+                    
                     surface.blit(scaled_btn_img, (final_x, final_y))
+                    
                     text = el.get('text', '')
+                    action = el.get('action', '')
+                    
+                    if action == 'toggle_music': text = f"{text}: {'ON' if self.config.get('music', True) else 'OFF'}"
+                    elif action == 'toggle_sfx': text = f"{text}: {'ON' if self.config.get('sfx', True) else 'OFF'}"
+                    elif action == 'toggle_fullscreen': text = f"{text}: {'ON' if self.config.get('fullscreen', False) else 'OFF'}"
+                    elif action == 'cycle_resolution': 
+                        res = self.resolutions[self.config.get('resolution_index', 2)]
+                        text = f"{text}: {res[0]}x{res[1]}"
+                        
                     if text:
                         text_surf = big_font.render(text, True, (255, 255, 255))
                         shadow_surf = big_font.render(text, True, (0, 0, 0))
