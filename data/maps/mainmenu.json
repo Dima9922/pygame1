@@ -38,5 +38,5 @@
     "bg_path": "bg/0",
     "level_order": 0,
     "ignore_in_progression": true,
-    "bg_music": null
+    "bg_music": "music.wav"
 }

@@ -69,7 +69,7 @@
         }
     ],
     "bg_path": "bg/0",
-    "level_order": 6,
+    "level_order": 7,
     "ignore_in_progression": true,
     "bg_music": "music.wav"
 }

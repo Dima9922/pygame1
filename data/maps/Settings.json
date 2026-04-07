@@ -8,9 +8,9 @@
                 238.75935828877004,
                 266.7700534759358
             ],
-            "text": "Exit",
-            "action": "quit_game",
-            "target": "1.json"
+            "text": "Main menu",
+            "action": "load_map",
+            "target": "mainmenu.json"
         },
         {
             "type": "buttonss",
@@ -69,7 +69,7 @@
         }
     ],
     "bg_path": "bg/0",
-    "level_order": 0,
+    "level_order": 6,
     "ignore_in_progression": true,
-    "bg_music": null
+    "bg_music": "music.wav"
 }

@@ -3420,8 +3420,8 @@
             ]
         }
     ],
-    "bg_path": "bg/1",
-    "bg_music": "ambience.wav",
+    "bg_path": "bg/0",
+    "bg_music": "music.wav",
     "level_order": 2,
     "ignore_in_progression": false,
     "is_menu": false

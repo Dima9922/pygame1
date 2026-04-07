@@ -1331,7 +1331,7 @@
     },
     "tile_size": 16,
     "offgrid": [],
-    "bg_path": "bg/1",
+    "bg_path": "bg/0",
     "bg_music": "music.wav",
     "level_order": 5,
     "ignore_in_progression": false,

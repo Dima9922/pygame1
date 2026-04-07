@@ -893,7 +893,7 @@
         }
     ],
     "bg_path": "bg/0",
-    "bg_music": null,
+    "bg_music": "music.wav",
     "level_order": 1,
     "ignore_in_progression": false,
     "is_menu": false
