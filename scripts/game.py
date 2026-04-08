@@ -25,12 +25,15 @@ class Game:
         self.dialogue_index = 0
         self.active_npc = None
         
+        # --- ТРЕКІНГ ПОТОЧНОЇ МУЗИКИ ---
         self.current_music_track = None 
         
+        # --- НАЛАШТУВАННЯ ТА СИСТЕМА КОНФІГІВ ---
         self.resolutions = [(640, 360), (960, 540), (1280, 720), (1600, 900), (1920, 1080)]
         self.config = {
             "music": True, 
             "sfx": True, 
+            "show_hud": True, # Додали вимикач інтерфейсу
             "resolution_index": 2, 
             "fullscreen": False, 
             "pause_map": "pause.json"
@@ -45,6 +48,7 @@ class Game:
         else:
             self.save_config()
         
+        # --- ІНВЕНТАР ТА ЗБЕРЕЖЕННЯ ---
         self.inventory = {'coin': 0, 'key': 0}
         self.level_start_inventory = {'coin': 0, 'key': 0} 
         
@@ -422,6 +426,10 @@ class Game:
                                     self.config['sfx'] = not self.config['sfx']
                                     self.save_config()
                                     break
+                                elif action == 'toggle_hud':
+                                    self.config['show_hud'] = not self.config.get('show_hud', True)
+                                    self.save_config()
+                                    break
                                 elif action == 'cycle_resolution':
                                     self.config['resolution_index'] = (self.config['resolution_index'] + 1) % len(self.resolutions)
                                     self.apply_display_mode()
@@ -532,7 +540,6 @@ class Game:
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
                                 if fx_key:
-                                    # === ФІКС ТУТ: Particle(self, ...) замість Particle(self.game, ...) ===
                                     self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     
@@ -607,6 +614,7 @@ class Game:
                     
                     if action == 'toggle_music': text = f"{text}: {'ON' if self.config.get('music', True) else 'OFF'}"
                     elif action == 'toggle_sfx': text = f"{text}: {'ON' if self.config.get('sfx', True) else 'OFF'}"
+                    elif action == 'toggle_hud': text = f"{text}: {'ON' if self.config.get('show_hud', True) else 'OFF'}"
                     elif action == 'toggle_fullscreen': text = f"{text}: {'ON' if self.config.get('fullscreen', False) else 'OFF'}"
                     elif action == 'cycle_resolution': 
                         res = self.resolutions[self.config.get('resolution_index', 2)]
@@ -664,41 +672,47 @@ class Game:
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
         surface.blit(self.display_2, screenshake_offset)
 
-        win_w, win_h = surface.get_size()
-        scale_x = win_w / 640
-        ui_font_size = max(16, int(18 * scale_x))
-        ui_font = pygame.font.SysFont('arial', ui_font_size, bold=True)
-        
-        base_x, base_y = max(10, int(10*scale_x)), max(10, int(10*scale_x))
-        current_x = base_x
-        
-        for item_type, amount in self.inventory.items():
-            icon = None
-            for spawner_name, props in self.tile_properties.items():
-                if props.get('preset') == 'Collectible' and props.get('col_type') == item_type:
-                    # Більше ніяких UI Icon Path!
-                    anim_path = props.get('anim_idle')
-                    if anim_path in self.assets:
-                        asset = self.assets[anim_path]
-                        icon = asset.images[0] if hasattr(asset, 'images') else asset
-                    if icon is None and spawner_name in self.assets:
-                        asset = self.assets[spawner_name]
-                        icon = asset[0] if isinstance(asset, list) else asset
-                    break
+        # === ДИНАМІЧНИЙ ІНВЕНТАР З ІКОНКАМИ (З ПЕРЕВІРКОЮ НА HUD) ===
+        if self.config.get('show_hud', True) and not self.is_menu_mode:
+            win_w, win_h = surface.get_size()
+            scale_x = win_w / 640
+            ui_font_size = max(16, int(18 * scale_x))
+            ui_font = pygame.font.SysFont('arial', ui_font_size, bold=True)
+            
+            base_x, base_y = max(10, int(10*scale_x)), max(10, int(10*scale_x))
+            current_x = base_x
+            
+            for item_type, amount in self.inventory.items():
+                icon = None
+                for spawner_name, props in self.tile_properties.items():
+                    if props.get('preset') == 'Collectible' and props.get('col_type') == item_type:
+                        ui_path = props.get('ui_icon', '')
+                        if ui_path:
+                            icon = self.get_image(ui_path, None)
+                        
+                        if icon is None:
+                            anim_path = props.get('anim_idle')
+                            if anim_path in self.assets:
+                                asset = self.assets[anim_path]
+                                icon = asset.images[0] if hasattr(asset, 'images') else asset
+                        if icon is None and spawner_name in self.assets:
+                            asset = self.assets[spawner_name]
+                            icon = asset[0] if isinstance(asset, list) else asset
+                        break
+                        
+                if icon is not None and (amount > 0 or item_type == 'coin'):
+                    icon_w = int(icon.get_width() * scale_x * 1.5)
+                    icon_h = int(icon.get_height() * scale_x * 1.5)
+                    scaled_icon = pygame.transform.scale(icon, (icon_w, icon_h))
+                    surface.blit(scaled_icon, (current_x, base_y))
                     
-            if icon is not None and (amount > 0 or item_type == 'coin'):
-                icon_w = int(icon.get_width() * scale_x * 1.5)
-                icon_h = int(icon.get_height() * scale_x * 1.5)
-                scaled_icon = pygame.transform.scale(icon, (icon_w, icon_h))
-                surface.blit(scaled_icon, (current_x, base_y))
-                
-                text_x = current_x + icon_w + int(5 * scale_x)
-                text_surf = ui_font.render(f" x {amount}", True, (255, 255, 255))
-                shadow = ui_font.render(f" x {amount}", True, (0, 0, 0))
-                
-                surface.blit(shadow, (text_x + 2, base_y + 2))
-                surface.blit(text_surf, (text_x, base_y))
-                current_x = text_x + text_surf.get_width() + int(20 * scale_x)
+                    text_x = current_x + icon_w + int(5 * scale_x)
+                    text_surf = ui_font.render(f" x {amount}", True, (255, 255, 255))
+                    shadow = ui_font.render(f" x {amount}", True, (0, 0, 0))
+                    
+                    surface.blit(shadow, (text_x + 2, base_y + 2))
+                    surface.blit(text_surf, (text_x, base_y))
+                    current_x = text_x + text_surf.get_width() + int(20 * scale_x)
 
         if self.is_paused:
             overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
@@ -713,7 +727,8 @@ class Game:
                 try:
                     with open(pause_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
-                        if data.get('is_menu', False): pause_ui_elements = data.get('ui_elements', [])
+                        if data.get('is_menu', False) or (data.get('ui_elements') and len(data['ui_elements']) > 0): 
+                            pause_ui_elements = data.get('ui_elements', [])
                 except: pass
             
             big_font_size = max(18, int(18 * scale_x)) 
@@ -757,15 +772,21 @@ class Game:
                                     sys.exit()
                                 elif action == 'toggle_music':
                                     self.config['music'] = not self.config['music']
-                                    if not self.config['music']: pygame.mixer.music.stop()
+                                    if not self.config['music']: 
+                                        pygame.mixer.music.stop()
                                     else:
                                         if getattr(self.tilemap, 'bg_music', None):
-                                            try: pygame.mixer.music.play(-1)
+                                            try: 
+                                                pygame.mixer.music.play(-1)
                                             except: pass
                                     self.save_config()
                                     break
                                 elif action == 'toggle_sfx':
                                     self.config['sfx'] = not self.config['sfx']
+                                    self.save_config()
+                                    break
+                                elif action == 'toggle_hud':
+                                    self.config['show_hud'] = not self.config.get('show_hud', True)
                                     self.save_config()
                                     break
                                 elif action == 'cycle_resolution':
@@ -802,6 +823,7 @@ class Game:
                     
                     if action == 'toggle_music': text = f"{text}: {'ON' if self.config.get('music', True) else 'OFF'}"
                     elif action == 'toggle_sfx': text = f"{text}: {'ON' if self.config.get('sfx', True) else 'OFF'}"
+                    elif action == 'toggle_hud': text = f"{text}: {'ON' if self.config.get('show_hud', True) else 'OFF'}"
                     elif action == 'toggle_fullscreen': text = f"{text}: {'ON' if self.config.get('fullscreen', False) else 'OFF'}"
                     elif action == 'cycle_resolution': 
                         res = self.resolutions[self.config.get('resolution_index', 2)]

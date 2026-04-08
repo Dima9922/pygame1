@@ -3151,22 +3151,6 @@
                 23,
                 -2
             ]
-        },
-        "9;5": {
-            "type": "npc",
-            "variant": 0,
-            "pos": [
-                9,
-                5
-            ]
-        },
-        "24;7": {
-            "type": "coins_spawn",
-            "variant": 0,
-            "pos": [
-                24,
-                7
-            ]
         }
     },
     "tile_size": 16,
@@ -3417,6 +3401,54 @@
             "pos": [
                 208.5,
                 -74.5
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                521.0,
+                47.5
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                586.5,
+                -23.5
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                71.5,
+                -29.5
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                -111.0,
+                31.5
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                107.5,
+                87.0
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                456.0,
+                188.5
             ]
         }
     ],

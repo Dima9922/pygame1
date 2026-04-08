@@ -180,6 +180,7 @@ class MainWindow(QMainWindow):
         
         setup_ui(self, assets)
         
+        # --- ПЕРЕХОПЛЕННЯ КОНСОЛІ ---
         self.stdout_wrapper = OutputWrapper()
         self.stdout_wrapper.text_written.connect(self.append_log)
         self.original_stdout = sys.stdout
@@ -201,10 +202,17 @@ class MainWindow(QMainWindow):
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_label)
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_input)
         
-        # ПІДКЛЮЧЕННЯ КНОПОК ПАНЕЛІ, ЯКІ ТЕПЕР СТВОРЕНІ В main_window_ui.py
+        # Підключення кнопок тулбару (новий дизайн)
         self.btn_toggle_editor.toggled.connect(self.on_editor_mode_toggled)
         self.btn_level_sequence.clicked.connect(self.open_level_sequence)
         self.btn_build_game.clicked.connect(self.on_build_game_clicked)
+        self.map_combo.currentTextChanged.connect(self.on_map_changed)
+        self.btn_new_map.clicked.connect(self.on_new_map_clicked)
+        self.btn_delete_map.clicked.connect(self.on_delete_map_clicked)
+        self.btn_change_type.clicked.connect(self.on_change_map_type_clicked)
+        self.btn_set_pause.clicked.connect(self.on_set_pause_clicked)
+        self.btn_save.clicked.connect(self.on_save_clicked)
+        self.btn_play.clicked.connect(self.on_play_clicked)
         
         os.makedirs('data/maps', exist_ok=True)
         if os.path.exists('map.json') and not os.path.exists('data/maps/0.json'):
@@ -214,13 +222,6 @@ class MainWindow(QMainWindow):
         current_map = self.map_combo.currentText()
         if current_map: self.on_map_changed(current_map)
 
-        self.map_combo.currentTextChanged.connect(self.on_map_changed)
-        self.btn_new_map.clicked.connect(self.on_new_map_clicked)
-        self.btn_delete_map.clicked.connect(self.on_delete_map_clicked)
-        self.btn_change_type.clicked.connect(self.on_change_map_type_clicked)
-        self.btn_set_pause.clicked.connect(self.on_set_pause_clicked)
-        self.btn_save.clicked.connect(self.on_save_clicked)
-        self.btn_play.clicked.connect(self.on_play_clicked)
         self.tree_view.clicked.connect(self.on_folder_clicked)
         self.tree_view.customContextMenuRequested.connect(self.show_context_menu)
         self.btn_new_folder.clicked.connect(self.on_new_folder_clicked)
@@ -247,7 +248,6 @@ class MainWindow(QMainWindow):
                   self.prop_anim_die_input] 
         if hasattr(self, 'prop_dialogue_input'): inputs.append(self.prop_dialogue_input)
         if hasattr(self, 'prop_dialogue_sound_input'): inputs.append(self.prop_dialogue_sound_input)
-        # ВИДАЛИЛИ prop_col_ui_icon_input
             
         for input_field in inputs: input_field.textChanged.connect(self.save_folder_properties)
         
@@ -376,7 +376,7 @@ class MainWindow(QMainWindow):
     def on_editor_mode_toggled(self, checked):
         if checked:
             self.btn_toggle_editor.setText("🌍 Level Editor")
-            self.btn_toggle_editor.setStyleSheet("background-color: #28a745; color: white; border: none; font-weight: bold;")
+            self.btn_toggle_editor.setStyleSheet("background-color: #28a745; color: white; border: none;")
             self.viewport.set_mode("MENU_EDITOR")
             self.prop_title.setText("Properties: UI Editor")
             self.btn_set_pause.show() 
@@ -410,7 +410,7 @@ class MainWindow(QMainWindow):
                     data = json.load(f)
                     is_menu_file = data.get('is_menu', False)
                     
-                    if 'ui_elements' in data:
+                    if data.get('ui_elements') and len(data['ui_elements']) > 0:
                         is_menu_file = True
                     elif 'tilemap' in data:
                         is_menu_file = False
@@ -445,7 +445,7 @@ class MainWindow(QMainWindow):
                 with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
                 
                 is_menu = data.get('is_menu', False)
-                if 'ui_elements' in data:
+                if data.get('ui_elements') and len(data['ui_elements']) > 0:
                     is_menu = True
                 elif 'tilemap' in data:
                     is_menu = False

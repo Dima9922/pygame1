@@ -1330,7 +1330,24 @@
         }
     },
     "tile_size": 16,
-    "offgrid": [],
+    "offgrid": [
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                134.0,
+                68.5
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                474.5,
+                3.0
+            ]
+        }
+    ],
     "bg_path": "bg/0",
     "bg_music": "music.wav",
     "level_order": 5,

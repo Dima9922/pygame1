@@ -3930,6 +3930,62 @@
                 538.0,
                 -17.0
             ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                218.0,
+                165.0
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                -104.5,
+                -45.0
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                564.0,
+                -28.0
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                446.5,
+                -222.0
+            ]
+        },
+        {
+            "type": "enemy_spawn",
+            "variant": 0,
+            "pos": [
+                376.5,
+                -21.5
+            ]
+        },
+        {
+            "type": "enemy_spawn",
+            "variant": 0,
+            "pos": [
+                322.0,
+                -22.0
+            ]
+        },
+        {
+            "type": "enemy_spawn",
+            "variant": 0,
+            "pos": [
+                324.5,
+                -180.5
+            ]
         }
     ],
     "bg_path": "bg/0",

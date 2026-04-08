@@ -2296,14 +2296,6 @@
                 12
             ]
         },
-        "15;4": {
-            "type": "player_spawn",
-            "variant": 0,
-            "pos": [
-                15,
-                4
-            ]
-        },
         "23;0": {
             "type": "end of level",
             "variant": 0,
@@ -2433,6 +2425,70 @@
             "pos": [
                 153.0,
                 -2.5
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                -89.0,
+                121.0
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                -160.0,
+                -120.0
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                394.0,
+                140.5
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                122.0,
+                132.0
+            ]
+        },
+        {
+            "type": "coins_spawn",
+            "variant": 0,
+            "pos": [
+                -55.5,
+                -40.0
+            ]
+        },
+        {
+            "type": "enemy_spawn",
+            "variant": 0,
+            "pos": [
+                48.0,
+                -101.5
+            ]
+        },
+        {
+            "type": "enemy_spawn",
+            "variant": 0,
+            "pos": [
+                253.5,
+                59.0
+            ]
+        },
+        {
+            "type": "player_spawn",
+            "variant": 0,
+            "pos": [
+                74.0,
+                140.0
             ]
         }
     ],

@@ -294,10 +294,13 @@ def setup_ui(main_window, assets):
 
     main_window.prop_col_type_label = QLabel("Collectible Type:")
     main_window.prop_col_type_combo = QComboBox()
-    main_window.prop_col_type_combo.addItems(["coin", "health", "key"])
-    main_window.prop_col_value_label = QLabel("Value / Heal Amount:")
+    main_window.prop_col_type_combo.addItems(["coin"])
+    main_window.prop_col_value_label = QLabel("Coin Value:")
     main_window.prop_col_value_input = QSpinBox()
     main_window.prop_col_value_input.setRange(1, 999)
+    main_window.prop_col_ui_icon_label = QLabel("HUD Icon Path (Optional):")
+    main_window.prop_col_ui_icon_input = QLineEdit()
+    main_window.prop_col_ui_icon_input.setPlaceholderText("Напр: entities/coin/hud.png")
     
     main_window.prop_spawner_layout.addWidget(main_window.prop_shoot_cb)
     main_window.prop_spawner_layout.addWidget(main_window.prop_weapon_img_label)
@@ -313,12 +316,14 @@ def setup_ui(main_window, assets):
     main_window.prop_spawner_layout.addWidget(main_window.prop_dialogue_input)
     main_window.prop_spawner_layout.addWidget(main_window.prop_dialogue_sound_label)
     main_window.prop_spawner_layout.addWidget(main_window.prop_dialogue_sound_input)
-
+    
     main_window.prop_spawner_layout.addWidget(main_window.prop_col_type_label)
     main_window.prop_spawner_layout.addWidget(main_window.prop_col_type_combo)
     main_window.prop_spawner_layout.addWidget(main_window.prop_col_value_label)
     main_window.prop_spawner_layout.addWidget(main_window.prop_col_value_input)
-
+    main_window.prop_spawner_layout.addWidget(main_window.prop_col_ui_icon_label)
+    main_window.prop_spawner_layout.addWidget(main_window.prop_col_ui_icon_input)
+    
     main_window.properties_layout.addWidget(main_window.prop_spawner_container)
 
     main_window.prop_ui_btn_container = QWidget()
@@ -329,7 +334,7 @@ def setup_ui(main_window, assets):
     main_window.prop_ui_text_input = QLineEdit()
     main_window.prop_ui_action_label = QLabel("On Click Action:")
     main_window.prop_ui_action_combo = QComboBox()
-    main_window.prop_ui_action_combo.addItems(["none", "load_map", "open_url", "quit_game", "resume_game", "toggle_music", "toggle_sfx", "cycle_resolution", "toggle_fullscreen"])
+    main_window.prop_ui_action_combo.addItems(["none", "load_map", "open_url", "quit_game", "resume_game", "toggle_music", "toggle_sfx", "toggle_hud", "cycle_resolution", "toggle_fullscreen"])
     main_window.prop_ui_target_label = QLabel("Target (Map/URL):")
     main_window.prop_ui_target_input = QComboBox()
     main_window.prop_ui_target_input.setEditable(True)
