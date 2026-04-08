@@ -65,10 +65,13 @@ def setup_ui(main_window, assets):
 
     # Блок 3: Білд та Сюжет
     main_window.btn_level_sequence = QPushButton("🚥 Sequence")
+    main_window.btn_game_settings = QPushButton("⚙️ Game Settings")
+    main_window.btn_game_settings.setToolTip("Налаштувати назву та іконку вікна гри")
     main_window.btn_build_game = QPushButton("🚀 Build Game")
     main_window.btn_build_game.setStyleSheet("background-color: #007acc; color: white; border: none; font-weight: bold;")
     
     main_window.toolbar_layout.addWidget(main_window.btn_level_sequence)
+    main_window.toolbar_layout.addWidget(main_window.btn_game_settings)
     main_window.toolbar_layout.addWidget(main_window.btn_build_game)
 
     # Відступ, щоб притиснути Save і Play вправо

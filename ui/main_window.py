@@ -170,6 +170,56 @@ class LevelSequenceDialog(QDialog):
                 except: pass
         self.accept()
 
+class GameSettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("⚙️ Game Settings")
+        self.resize(400, 150)
+        self.layout = QFormLayout(self)
+
+        self.title_input = QLineEdit()
+        self.icon_path = QLineEdit()
+        self.btn_browse_icon = QPushButton("Browse .png...")
+        self.btn_browse_icon.clicked.connect(self.browse_icon)
+
+        icon_layout = QHBoxLayout()
+        icon_layout.addWidget(self.icon_path)
+        icon_layout.addWidget(self.btn_browse_icon)
+
+        self.layout.addRow("Назва вікна гри:", self.title_input)
+        self.layout.addRow("Іконка вікна (PNG):", icon_layout)
+
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        self.buttons.accepted.connect(self.save_settings)
+        self.buttons.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttons)
+
+        self.load_settings()
+
+    def browse_icon(self):
+        file, _ = QFileDialog.getOpenFileName(self, "Виберіть іконку", "data/images", "Images (*.png)")
+        if file:
+            rel_path = os.path.relpath(file, os.path.abspath("."))
+            self.icon_path.setText(rel_path.replace('\\', '/'))
+
+    def load_settings(self):
+        if os.path.exists('data/project.json'):
+            try:
+                with open('data/project.json', 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.title_input.setText(data.get('title', 'My Awesome Game'))
+                    self.icon_path.setText(data.get('icon', ''))
+            except: pass
+
+    def save_settings(self):
+        data = {
+            'title': self.title_input.text(),
+            'icon': self.icon_path.text()
+        }
+        with open('data/project.json', 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        self.accept()
+
 class MainWindow(QMainWindow):
     def __init__(self, assets):
         super().__init__()
@@ -180,6 +230,9 @@ class MainWindow(QMainWindow):
         
         setup_ui(self, assets)
         
+        if os.path.exists("icon.png"):
+            self.setWindowIcon(QIcon("icon.png"))
+            
         # --- ПЕРЕХОПЛЕННЯ КОНСОЛІ ---
         self.stdout_wrapper = OutputWrapper()
         self.stdout_wrapper.text_written.connect(self.append_log)
@@ -202,9 +255,10 @@ class MainWindow(QMainWindow):
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_label)
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_input)
         
-        # Підключення кнопок тулбару (новий дизайн)
+        # Підключення кнопок тулбару
         self.btn_toggle_editor.toggled.connect(self.on_editor_mode_toggled)
         self.btn_level_sequence.clicked.connect(self.open_level_sequence)
+        self.btn_game_settings.clicked.connect(self.open_game_settings)
         self.btn_build_game.clicked.connect(self.on_build_game_clicked)
         self.map_combo.currentTextChanged.connect(self.on_map_changed)
         self.btn_new_map.clicked.connect(self.on_new_map_clicked)
@@ -248,6 +302,9 @@ class MainWindow(QMainWindow):
                   self.prop_anim_die_input] 
         if hasattr(self, 'prop_dialogue_input'): inputs.append(self.prop_dialogue_input)
         if hasattr(self, 'prop_dialogue_sound_input'): inputs.append(self.prop_dialogue_sound_input)
+        
+        # ДОДАЛИ ЗНОВУ: зберігаємо іконку!
+        if hasattr(self, 'prop_col_ui_icon_input'): inputs.append(self.prop_col_ui_icon_input)
             
         for input_field in inputs: input_field.textChanged.connect(self.save_folder_properties)
         
@@ -282,6 +339,10 @@ class MainWindow(QMainWindow):
             self.console_output.setTextColor(QColor("#cccccc")) 
         self.console_output.insertPlainText(text)
         self.console_output.moveCursor(QTextCursor.End)
+
+    def open_game_settings(self):
+        dialog = GameSettingsDialog(self)
+        dialog.exec()
 
     def on_set_pause_clicked(self):
         map_name = self.map_combo.currentText()
@@ -603,6 +664,11 @@ class MainWindow(QMainWindow):
             self.prop_col_value_label.setVisible(is_collectible)
             self.prop_col_value_input.setVisible(is_collectible)
             
+            # ВІДОБРАЖАЄМО ПОЛЕ ІКОНКИ ДЛЯ COLLECTIBLE
+            if hasattr(self, 'prop_col_ui_icon_input'):
+                self.prop_col_ui_icon_label.setVisible(is_collectible)
+                self.prop_col_ui_icon_input.setVisible(is_collectible)
+            
         if hasattr(self, 'sfx_container'):
             is_spawner = (self.prop_type_combo.currentText() == "Spawner")
             show_sfx = is_spawner and not is_npc
@@ -636,8 +702,13 @@ class MainWindow(QMainWindow):
                       self.prop_sfx_dash_input, self.prop_sfx_shoot_input,
                       self.prop_anim_die_input]
             if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
+            
+            # ЗКИДАЄМО ПОЛЕ ІКОНКИ
             if hasattr(self, 'prop_col_type_combo'): 
                 widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
+                if hasattr(self, 'prop_col_ui_icon_input'):
+                    widgets.append(self.prop_col_ui_icon_input)
+                    
             for w in widgets: w.blockSignals(True)
             
             self.prop_type_combo.setCurrentText("Static Blocks")
@@ -657,9 +728,13 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'prop_dialogue_input'): 
                 self.prop_dialogue_input.setText("Привіт!;Як справи?")
                 self.prop_dialogue_sound_input.setText("talk.wav")
+                
             if hasattr(self, 'prop_col_type_combo'):
                 self.prop_col_type_combo.setCurrentText("coin")
                 self.prop_col_value_input.setValue(1)
+                if hasattr(self, 'prop_col_ui_icon_input'):
+                    self.prop_col_ui_icon_input.setText("")
+                    
             self.prop_collision_cb.setChecked(True)
             self.prop_visible_cb.setChecked(True)
             self.prop_walk_cb.setChecked(False)
@@ -706,8 +781,12 @@ class MainWindow(QMainWindow):
         
         if hasattr(self, 'prop_ui_text_input'): widgets.extend([self.prop_ui_text_input, self.prop_ui_action_combo, self.prop_ui_target_input])
         if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
+        
+        # ЗАВАНТАЖУЄМО ПОЛЕ ІКОНКИ
         if hasattr(self, 'prop_col_type_combo'): 
             widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
+            if hasattr(self, 'prop_col_ui_icon_input'):
+                widgets.append(self.prop_col_ui_icon_input)
             
         for w in widgets: w.blockSignals(True)
         
@@ -736,9 +815,12 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'prop_dialogue_input'): 
                     self.prop_dialogue_input.setText(data.get('dialogue_text', 'Привіт!;Як справи?'))
                     self.prop_dialogue_sound_input.setText(data.get('dialogue_sound', 'talk.wav'))
+                    
                 if hasattr(self, 'prop_col_type_combo'):
                     self.prop_col_type_combo.setCurrentText(data.get('col_type', 'coin'))
                     self.prop_col_value_input.setValue(data.get('col_value', 1))
+                    if hasattr(self, 'prop_col_ui_icon_input'):
+                        self.prop_col_ui_icon_input.setText(data.get('ui_icon', ''))
                 
                 sfx_hit = data.get('sfx_hit', 'hit.wav')
                 sfx_jump = data.get('sfx_jump', 'jump.wav')
@@ -787,6 +869,8 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'prop_col_type_combo'):
                 self.prop_col_type_combo.setCurrentText("coin")
                 self.prop_col_value_input.setValue(1)
+                if hasattr(self, 'prop_col_ui_icon_input'):
+                    self.prop_col_ui_icon_input.setText("")
             self.prop_sfx_hit_slider.setValue(60)
             self.prop_sfx_jump_slider.setValue(60)
             self.prop_sfx_dash_slider.setValue(60)
@@ -852,6 +936,10 @@ class MainWindow(QMainWindow):
             'dialogue_sound': self.prop_dialogue_sound_input.text() if hasattr(self, 'prop_dialogue_sound_input') else 'talk.wav',
             'col_type': self.prop_col_type_combo.currentText() if hasattr(self, 'prop_col_type_combo') else 'coin',
             'col_value': self.prop_col_value_input.value() if hasattr(self, 'prop_col_value_input') else 1,
+            
+            # ЗБЕРЕЖЕННЯ ІКОНКИ
+            'ui_icon': self.prop_col_ui_icon_input.text() if hasattr(self, 'prop_col_ui_icon_input') else '',
+            
             'sfx_hit': self.prop_sfx_hit_input.text() if hasattr(self, 'prop_sfx_hit_input') else 'hit.wav',
             'sfx_jump': self.prop_sfx_jump_input.text() if hasattr(self, 'prop_sfx_jump_input') else 'jump.wav',
             'sfx_dash': self.prop_sfx_dash_input.text() if hasattr(self, 'prop_sfx_dash_input') else 'dash.wav',

@@ -47,6 +47,25 @@ class Game:
             except: pass
         else:
             self.save_config()
+            
+        # --- ЧИТАЄМО НАЗВУ ТА ІКОНКУ ГРИ ---
+        project_data = {}
+        if os.path.exists('data/project.json'):
+            try:
+                with open('data/project.json', 'r', encoding='utf-8') as f:
+                    project_data = json.load(f)
+            except: pass
+
+        game_title = project_data.get('title', 'My Awesome Game')
+        icon_path = project_data.get('icon', '')
+
+        pygame.display.set_caption(game_title) # Ставимо назву вікна
+        
+        if icon_path and os.path.exists(icon_path):
+            try:
+                icon_img = pygame.image.load(icon_path).convert_alpha()
+                pygame.display.set_icon(icon_img) # Ставимо іконку вікна
+            except: pass
         
         # --- ІНВЕНТАР ТА ЗБЕРЕЖЕННЯ ---
         self.inventory = {'coin': 0, 'key': 0}
@@ -540,6 +559,7 @@ class Game:
                                 speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
                                 if fx_key:
+                                    # ВАЖЛИВО: self замість self.game
                                     self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     
@@ -672,7 +692,6 @@ class Game:
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
         surface.blit(self.display_2, screenshake_offset)
 
-        # === ДИНАМІЧНИЙ ІНВЕНТАР З ІКОНКАМИ (З ПЕРЕВІРКОЮ НА HUD) ===
         if self.config.get('show_hud', True) and not self.is_menu_mode:
             win_w, win_h = surface.get_size()
             scale_x = win_w / 640
@@ -686,15 +705,10 @@ class Game:
                 icon = None
                 for spawner_name, props in self.tile_properties.items():
                     if props.get('preset') == 'Collectible' and props.get('col_type') == item_type:
-                        ui_path = props.get('ui_icon', '')
-                        if ui_path:
-                            icon = self.get_image(ui_path, None)
-                        
-                        if icon is None:
-                            anim_path = props.get('anim_idle')
-                            if anim_path in self.assets:
-                                asset = self.assets[anim_path]
-                                icon = asset.images[0] if hasattr(asset, 'images') else asset
+                        anim_path = props.get('anim_idle')
+                        if anim_path in self.assets:
+                            asset = self.assets[anim_path]
+                            icon = asset.images[0] if hasattr(asset, 'images') else asset
                         if icon is None and spawner_name in self.assets:
                             asset = self.assets[spawner_name]
                             icon = asset[0] if isinstance(asset, list) else asset
@@ -772,12 +786,10 @@ class Game:
                                     sys.exit()
                                 elif action == 'toggle_music':
                                     self.config['music'] = not self.config['music']
-                                    if not self.config['music']: 
-                                        pygame.mixer.music.stop()
+                                    if not self.config['music']: pygame.mixer.music.stop()
                                     else:
                                         if getattr(self.tilemap, 'bg_music', None):
-                                            try: 
-                                                pygame.mixer.music.play(-1)
+                                            try: pygame.mixer.music.play(-1)
                                             except: pass
                                     self.save_config()
                                     break
