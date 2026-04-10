@@ -26,7 +26,6 @@ def setup_ui(main_window, assets):
     main_window.toolbar_layout.setContentsMargins(10, 5, 10, 5)
     main_window.toolbar_layout.setSpacing(8)
 
-    # Блок 1: Керування мапами
     main_window.toolbar_layout.addWidget(QLabel("Map:"))
     main_window.map_combo = QComboBox()
     main_window.map_combo.setMinimumWidth(120)
@@ -34,58 +33,52 @@ def setup_ui(main_window, assets):
     
     main_window.btn_new_map = QPushButton("+ New")
     main_window.btn_delete_map = QPushButton("❌ Delete")
-    main_window.btn_delete_map.setStyleSheet("color: #f44336;")
+    main_window.btn_delete_map.setObjectName("DeleteMapBtn")
     main_window.toolbar_layout.addWidget(main_window.btn_new_map)
     main_window.toolbar_layout.addWidget(main_window.btn_delete_map)
 
-    # Розділювач
     div1 = QFrame()
     div1.setFrameShape(QFrame.VLine)
-    div1.setStyleSheet("color: #444;")
+    div1.setObjectName("ToolbarDivider")
     main_window.toolbar_layout.addWidget(div1)
 
-    # Блок 2: Режими та Пауза
     main_window.btn_change_type = QPushButton("🔄 Type") 
     main_window.btn_change_type.setToolTip("Змінити тип карти (Меню <-> Ігровий Рівень)")
     main_window.btn_toggle_editor = QPushButton("🎨 Menu Editor")
     main_window.btn_toggle_editor.setCheckable(True)
+    main_window.btn_toggle_editor.setObjectName("ToggleEditorBtn")
     main_window.btn_set_pause = QPushButton("⏸ Set as Pause")
-    main_window.btn_set_pause.setStyleSheet("color: #ffeb3b;")
+    main_window.btn_set_pause.setObjectName("SetPauseBtn")
     main_window.btn_set_pause.hide() 
     
     main_window.toolbar_layout.addWidget(main_window.btn_change_type)
     main_window.toolbar_layout.addWidget(main_window.btn_toggle_editor)
     main_window.toolbar_layout.addWidget(main_window.btn_set_pause)
 
-    # Розділювач
     div2 = QFrame()
     div2.setFrameShape(QFrame.VLine)
-    div2.setStyleSheet("color: #444;")
+    div2.setObjectName("ToolbarDivider")
     main_window.toolbar_layout.addWidget(div2)
 
-    # Блок 3: Білд та Сюжет
     main_window.btn_level_sequence = QPushButton("🚥 Sequence")
     main_window.btn_game_settings = QPushButton("⚙️ Game Settings")
     main_window.btn_game_settings.setToolTip("Налаштувати назву та іконку вікна гри")
     main_window.btn_build_game = QPushButton("🚀 Build Game")
-    main_window.btn_build_game.setStyleSheet("background-color: #007acc; color: white; border: none; font-weight: bold;")
+    main_window.btn_build_game.setObjectName("BuildBtn") 
     
     main_window.toolbar_layout.addWidget(main_window.btn_level_sequence)
     main_window.toolbar_layout.addWidget(main_window.btn_game_settings)
     main_window.toolbar_layout.addWidget(main_window.btn_build_game)
 
-    # Відступ, щоб притиснути Save і Play вправо
     main_window.toolbar_layout.addStretch()
 
-    # Блок 4: Збереження та Гра
     main_window.btn_save = QPushButton("💾 Save")
     main_window.btn_play = QPushButton("▶ PLAY")
-    main_window.btn_save.setStyleSheet("background-color: #007acc; color: white; border: none; font-weight: bold;")
-    main_window.btn_play.setStyleSheet("background-color: #28a745; color: white; border: none; font-weight: bold;")
+    main_window.btn_save.setObjectName("SaveBtn") 
+    main_window.btn_play.setObjectName("PlayBtn") 
     
     main_window.toolbar_layout.addWidget(main_window.btn_save)
     main_window.toolbar_layout.addWidget(main_window.btn_play)
-    
     main_window.main_layout.addWidget(main_window.toolbar)
 
     main_window.horizontal_splitter = QSplitter(Qt.Horizontal)
@@ -143,7 +136,7 @@ def setup_ui(main_window, assets):
     main_window.sidebar_layout.addWidget(main_window.btn_add_audio)
 
     main_window.btn_new_folder = QPushButton("+ Folder")
-    main_window.btn_new_folder.setObjectName("NewFolderBtn") # Для QSS
+    main_window.btn_new_folder.setObjectName("NewFolderBtn") 
     main_window.sidebar_layout.addWidget(main_window.btn_new_folder)
     main_window.sidebar_panel.setWidget(main_window.sidebar_widget)
 
@@ -179,11 +172,7 @@ def setup_ui(main_window, assets):
     main_window.properties_layout = QVBoxLayout(main_window.properties_widget)
     
     main_window.prop_title = QLabel("Properties")
-    main_window.prop_title.setStyleSheet("""
-        font-weight: bold; font-size: 15px; color: #ffffff; 
-        background-color: #222222; padding: 6px 10px; 
-        border-left: 4px solid #fbc02d; margin-bottom: 5px;
-    """)
+    main_window.prop_title.setObjectName("PropTitle")
     main_window.properties_layout.addWidget(main_window.prop_title)
     
     main_window.prop_type_label = QLabel("Object Type:")
@@ -205,9 +194,9 @@ def setup_ui(main_window, assets):
     main_window.prop_bg_layout = QVBoxLayout(main_window.prop_bg_container)
     main_window.prop_bg_layout.setContentsMargins(0, 0, 0, 0)
     main_window.prop_current_bg_label = QLabel("Active BG: None")
-    main_window.prop_current_bg_label.setStyleSheet("color: #0366d6; font-weight: bold;")
+    main_window.prop_current_bg_label.setObjectName("ActiveBgLabel")
     main_window.prop_current_music_label = QLabel("Active Music: None")
-    main_window.prop_current_music_label.setStyleSheet("color: #28a745; font-weight: bold;")
+    main_window.prop_current_music_label.setObjectName("ActiveMusicLabel")
     main_window.btn_clear_bg = QPushButton("Clear BG & Music")
     main_window.prop_bg_layout.addWidget(QLabel("1. Click a Tile to set Background"))
     main_window.prop_bg_layout.addWidget(main_window.prop_current_bg_label)
@@ -228,11 +217,11 @@ def setup_ui(main_window, assets):
 
     main_window.char_divider = QFrame()
     main_window.char_divider.setFrameShape(QFrame.HLine)
-    main_window.char_divider.setStyleSheet("background-color: #555; margin: 10px 0 5px 0;")
+    main_window.char_divider.setObjectName("SectionDivider")
     main_window.prop_spawner_layout.addWidget(main_window.char_divider)
 
     main_window.char_title_label = QLabel("CHARACTER / ITEM SETTINGS")
-    main_window.char_title_label.setStyleSheet("font-weight: bold; color: #fbc02d; font-size: 11px;")
+    main_window.char_title_label.setObjectName("SectionTitle")
     main_window.prop_spawner_layout.addWidget(main_window.char_title_label)
 
     main_window.prop_anim_idle_label = QLabel("Idle Anim:")
@@ -352,12 +341,11 @@ def setup_ui(main_window, assets):
     
     main_window.sfx_divider = QFrame()
     main_window.sfx_divider.setFrameShape(QFrame.HLine)
-    main_window.sfx_divider.setFrameShadow(QFrame.Sunken)
-    main_window.sfx_divider.setStyleSheet("background-color: #555; margin: 15px 0 5px 0;")
+    main_window.sfx_divider.setObjectName("SectionDivider")
     main_window.properties_layout.addWidget(main_window.sfx_divider)
 
     main_window.sfx_title_label = QLabel("SFX SETTINGS & VOLUMES")
-    main_window.sfx_title_label.setStyleSheet("font-weight: bold; color: #fbc02d; font-size: 11px;")
+    main_window.sfx_title_label.setObjectName("SectionTitle")
     main_window.properties_layout.addWidget(main_window.sfx_title_label)
 
     main_window.sfx_container = QWidget()
@@ -400,7 +388,7 @@ def setup_ui(main_window, assets):
     main_window.properties_layout.addWidget(main_window.sfx_container)
 
     main_window.btn_reset_props = QPushButton("Reset Properties")
-    main_window.btn_reset_props.setStyleSheet("background-color: #d73a49; color: white; font-weight: bold; margin-top: 15px;")
+    main_window.btn_reset_props.setObjectName("ResetPropsBtn")
     main_window.properties_layout.addWidget(main_window.btn_reset_props)
     main_window.properties_layout.addStretch()
     
@@ -420,12 +408,12 @@ def setup_ui(main_window, assets):
     main_window.console_layout.setContentsMargins(0, 0, 0, 0)
     
     main_window.console_header = QLabel(" 💻 Console Output (Логи та Помилки)")
-    main_window.console_header.setStyleSheet("background-color: #1e1e1e; color: #fbc02d; font-weight: bold; padding: 4px; border-top: 2px solid #333;")
+    main_window.console_header.setObjectName("ConsoleHeader")
     main_window.console_layout.addWidget(main_window.console_header)
     
     main_window.console_output = QTextEdit()
     main_window.console_output.setReadOnly(True)
-    main_window.console_output.setStyleSheet("background-color: #0d0d0d; color: #cccccc; font-family: Consolas, monospace; font-size: 13px; border: none; padding: 5px;")
+    main_window.console_output.setObjectName("ConsoleOutput")
     main_window.console_layout.addWidget(main_window.console_output)
     
     main_window.main_vertical_splitter.addWidget(main_window.console_container)

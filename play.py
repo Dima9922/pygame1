@@ -5,13 +5,17 @@ import json
 from scripts.game import Game
 from scripts.utils import load_images
 
-# Ця магія потрібна, щоб скомпільований exe-файл правильно бачив папки
-def resource_path(relative_path):
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+os.environ['SDL_VIDEO_CENTERED'] = '1'
 
-os.chdir(resource_path("."))
+# Надійний спосіб знайти папку з грою (Бронебійний фікс)
+if getattr(sys, 'frozen', False):
+    base_dir = os.path.dirname(sys.executable)
+    if os.path.exists(os.path.join(base_dir, "_internal", "data")):
+        os.chdir(os.path.join(base_dir, "_internal"))
+    else:
+        os.chdir(base_dir)
+else:
+    os.chdir(os.path.abspath("."))
 
 def main():
     pygame.init()

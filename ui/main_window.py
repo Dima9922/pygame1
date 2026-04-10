@@ -29,12 +29,12 @@ class BuildDialog(QDialog):
         self.layout = QVBoxLayout(self)
         
         info_label = QLabel("Збираємо гру... Це займе всього пару секунд!")
-        info_label.setStyleSheet("font-weight: bold; color: #fff;")
+        info_label.setObjectName("BuildInfoLabel")
         self.layout.addWidget(info_label)
         
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setStyleSheet("background-color: #1e1e1e; color: #00ff00; font-family: Consolas, monospace;")
+        self.log_text.setObjectName("BuildLogText")
         self.layout.addWidget(self.log_text)
         
         self.progress = QProgressBar()
@@ -60,7 +60,9 @@ class BuildDialog(QDialog):
             self.log_text.append(f"❌ ПОМИЛКА: Папку 'template' не знайдено тут:\n👉 {template_path}")
             self.log_text.append("\nБудь ласка, переконайся, що папка 'template' існує!")
             self.progress.setValue(100)
-            self.progress.setStyleSheet("QProgressBar::chunk { background-color: red; }")
+            self.progress.setProperty("state", "error")
+            self.progress.style().unpolish(self.progress)
+            self.progress.style().polish(self.progress)
             self.btn_close.setText("Close")
             return
             
@@ -96,7 +98,9 @@ class BuildDialog(QDialog):
             if os.path.exists(old_exe): os.rename(old_exe, new_exe)
                 
             self.progress.setValue(100)
-            self.progress.setStyleSheet("QProgressBar::chunk { background-color: #28a745; }")
+            self.progress.setProperty("state", "success")
+            self.progress.style().unpolish(self.progress)
+            self.progress.style().polish(self.progress)
             self.log_text.append("-" * 50 + "\n✅ Гра успішно зібрана!")
             self.log_text.append(f"🎉 ГОТОВО! Твоя гра знаходиться тут:\n👉 {final_dest}")
             
@@ -107,7 +111,9 @@ class BuildDialog(QDialog):
         except Exception as e:
             self.log_text.append(f"❌ Помилка: {e}")
             self.progress.setValue(100)
-            self.progress.setStyleSheet("QProgressBar::chunk { background-color: red; }")
+            self.progress.setProperty("state", "error")
+            self.progress.style().unpolish(self.progress)
+            self.progress.style().polish(self.progress)
             self.btn_close.setText("Close")
             
     def open_folder(self, path):
@@ -122,12 +128,12 @@ class LevelSequenceDialog(QDialog):
         self.resize(400, 500)
         self.layout = QVBoxLayout(self)
         info_label = QLabel("Перетягуй мапи мишкою, щоб змінити порядок.\n☑ Галочка = Грати в кампанії | ☐ Пусто = Ігнорувати (для Паузи)")
-        info_label.setStyleSheet("color: #aaa; font-style: italic; margin-bottom: 5px;")
+        info_label.setObjectName("SeqInfoLabel")
         self.layout.addWidget(info_label)
         
         self.list_widget = QListWidget()
         self.list_widget.setDragDropMode(QAbstractItemView.InternalMove)
-        self.list_widget.setStyleSheet("QListWidget::item { padding: 5px; border-bottom: 1px solid #444; }")
+        self.list_widget.setObjectName("SeqListWidget")
         self.layout.addWidget(self.list_widget)
         
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
@@ -233,7 +239,6 @@ class MainWindow(QMainWindow):
         if os.path.exists("icon.png"):
             self.setWindowIcon(QIcon("icon.png"))
             
-        # --- ПЕРЕХОПЛЕННЯ КОНСОЛІ ---
         self.stdout_wrapper = OutputWrapper()
         self.stdout_wrapper.text_written.connect(self.append_log)
         self.original_stdout = sys.stdout
@@ -255,7 +260,6 @@ class MainWindow(QMainWindow):
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_label)
         self.prop_spawner_container.layout().addWidget(self.prop_anim_die_input)
         
-        # Підключення кнопок тулбару
         self.btn_toggle_editor.toggled.connect(self.on_editor_mode_toggled)
         self.btn_level_sequence.clicked.connect(self.open_level_sequence)
         self.btn_game_settings.clicked.connect(self.open_game_settings)
@@ -302,8 +306,6 @@ class MainWindow(QMainWindow):
                   self.prop_anim_die_input] 
         if hasattr(self, 'prop_dialogue_input'): inputs.append(self.prop_dialogue_input)
         if hasattr(self, 'prop_dialogue_sound_input'): inputs.append(self.prop_dialogue_sound_input)
-        
-        # ДОДАЛИ ЗНОВУ: зберігаємо іконку!
         if hasattr(self, 'prop_col_ui_icon_input'): inputs.append(self.prop_col_ui_icon_input)
             
         for input_field in inputs: input_field.textChanged.connect(self.save_folder_properties)
@@ -437,13 +439,11 @@ class MainWindow(QMainWindow):
     def on_editor_mode_toggled(self, checked):
         if checked:
             self.btn_toggle_editor.setText("🌍 Level Editor")
-            self.btn_toggle_editor.setStyleSheet("background-color: #28a745; color: white; border: none;")
             self.viewport.set_mode("MENU_EDITOR")
             self.prop_title.setText("Properties: UI Editor")
             self.btn_set_pause.show() 
         else:
             self.btn_toggle_editor.setText("🎨 Menu Editor")
-            self.btn_toggle_editor.setStyleSheet("")
             self.viewport.set_mode("EDITOR")
             self.prop_title.setText("Properties")
             self.btn_set_pause.hide() 
@@ -663,8 +663,6 @@ class MainWindow(QMainWindow):
             self.prop_col_type_combo.setVisible(is_collectible)
             self.prop_col_value_label.setVisible(is_collectible)
             self.prop_col_value_input.setVisible(is_collectible)
-            
-            # ВІДОБРАЖАЄМО ПОЛЕ ІКОНКИ ДЛЯ COLLECTIBLE
             if hasattr(self, 'prop_col_ui_icon_input'):
                 self.prop_col_ui_icon_label.setVisible(is_collectible)
                 self.prop_col_ui_icon_input.setVisible(is_collectible)
@@ -703,7 +701,6 @@ class MainWindow(QMainWindow):
                       self.prop_anim_die_input]
             if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
             
-            # ЗКИДАЄМО ПОЛЕ ІКОНКИ
             if hasattr(self, 'prop_col_type_combo'): 
                 widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
                 if hasattr(self, 'prop_col_ui_icon_input'):
@@ -782,7 +779,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'prop_ui_text_input'): widgets.extend([self.prop_ui_text_input, self.prop_ui_action_combo, self.prop_ui_target_input])
         if hasattr(self, 'prop_dialogue_input'): widgets.extend([self.prop_dialogue_input, self.prop_dialogue_sound_input])
         
-        # ЗАВАНТАЖУЄМО ПОЛЕ ІКОНКИ
         if hasattr(self, 'prop_col_type_combo'): 
             widgets.extend([self.prop_col_type_combo, self.prop_col_value_input])
             if hasattr(self, 'prop_col_ui_icon_input'):
@@ -936,10 +932,7 @@ class MainWindow(QMainWindow):
             'dialogue_sound': self.prop_dialogue_sound_input.text() if hasattr(self, 'prop_dialogue_sound_input') else 'talk.wav',
             'col_type': self.prop_col_type_combo.currentText() if hasattr(self, 'prop_col_type_combo') else 'coin',
             'col_value': self.prop_col_value_input.value() if hasattr(self, 'prop_col_value_input') else 1,
-            
-            # ЗБЕРЕЖЕННЯ ІКОНКИ
             'ui_icon': self.prop_col_ui_icon_input.text() if hasattr(self, 'prop_col_ui_icon_input') else '',
-            
             'sfx_hit': self.prop_sfx_hit_input.text() if hasattr(self, 'prop_sfx_hit_input') else 'hit.wav',
             'sfx_jump': self.prop_sfx_jump_input.text() if hasattr(self, 'prop_sfx_jump_input') else 'jump.wav',
             'sfx_dash': self.prop_sfx_dash_input.text() if hasattr(self, 'prop_sfx_dash_input') else 'dash.wav',
@@ -1088,11 +1081,13 @@ class MainWindow(QMainWindow):
             except: pass
 
     def on_play_clicked(self):
-        if self.btn_play.text() == "▶ PLAY":
+        if self.btn_play.objectName() == "PlayBtn":
             self.on_save_clicked() 
             with open('data/maps/current_play.txt', 'w') as f: f.write(self.map_combo.currentText())
             self.btn_play.setText("■ STOP")
-            self.btn_play.setStyleSheet("background-color: #d73a49; color: white; border: none; font-weight: bold;")
+            self.btn_play.setObjectName("StopBtn")
+            self.btn_play.style().unpolish(self.btn_play)
+            self.btn_play.style().polish(self.btn_play)
             self.sidebar_panel.hide()
             self.browser_scroll.hide() 
             self.properties_panel.hide()
@@ -1101,7 +1096,9 @@ class MainWindow(QMainWindow):
             self.viewport.setFocus()
         else:
             self.btn_play.setText("▶ PLAY")
-            self.btn_play.setStyleSheet("background-color: #28a745; color: white; border: none; font-weight: bold;")
+            self.btn_play.setObjectName("PlayBtn")
+            self.btn_play.style().unpolish(self.btn_play)
+            self.btn_play.style().polish(self.btn_play)
             try:
                 pygame.mixer.music.stop()
                 pygame.mixer.stop()

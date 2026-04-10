@@ -2,7 +2,7 @@
     "music": true,
     "sfx": true,
     "show_hud": true,
-    "resolution_index": 4,
-    "fullscreen": true,
+    "resolution_index": 1,
+    "fullscreen": false,
     "pause_map": "pause.json"
 }

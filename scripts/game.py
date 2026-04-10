@@ -12,6 +12,8 @@ from scripts.clouds import Clouds
 from scripts.particle import Particle
 from scripts.spark import Spark
 
+os.environ['SDL_VIDEO_CENTERED'] = '1'
+
 class Game:
     def __init__(self, assets, v_width, v_height):
         self.assets = assets.copy() 
@@ -27,13 +29,22 @@ class Game:
         
         self.current_music_track = None 
         
-        # === ТІЛЬКИ ІДЕАЛЬНІ РОЗМІРИ ===
+        self.dead = 0
+        self.transition = 0
+        self.scroll = [0, 0]
+        self.enemies = []
+        self.npcs = []
+        self.collectibles = []
+        self.projectiles = []
+        self.particles = []
+        self.sparks = []
+        
         self.resolutions = [(640, 360), (1280, 720), (1920, 1080)]
         self.config = {
             "music": True, 
             "sfx": True, 
             "show_hud": True,
-            "resolution_index": 1, # За замовчуванням 1280x720
+            "resolution_index": 1, 
             "fullscreen": False, 
             "pause_map": "pause.json"
         }
@@ -163,7 +174,9 @@ class Game:
 
     def apply_display_mode(self):
         if 'PySide6' not in sys.modules: 
-            res = self.resolutions[self.config.get('resolution_index', 1)]
+            idx = self.config.get('resolution_index', 1)
+            if idx >= len(self.resolutions): idx = 1
+            res = self.resolutions[idx]
             flags = pygame.FULLSCREEN | pygame.SCALED if self.config['fullscreen'] else 0
             try: pygame.display.set_mode(res, flags)
             except: pygame.display.set_mode(res)
@@ -411,6 +424,18 @@ class Game:
                         if self.active_npc: self.play_sound(self.active_npc.dialogue_sound, 'talk.wav')
             return 
 
+        # === ПЕРЕХОПЛЕННЯ КНОПКИ ПАУЗИ ===
+        for event in events:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                if not self.is_menu_mode: 
+                    self.is_paused = not self.is_paused
+                    
+        # === ЗУПИНКА ЧАСУ (ЛОГІКИ ГРИ), ЯКЩО ПАУЗА АКТИВНА ===
+        if self.is_paused:
+            self.movement = [False, False]
+            return
+        # =======================================================
+
         self.screenshake = max(0, self.screenshake - 1)
         if not self.dead and not getattr(self, 'level_complete', False):
             if hasattr(self.tilemap, 'check_level_exits') and self.tilemap.check_level_exits(self.player.rect()):
@@ -497,8 +522,7 @@ class Game:
 
         for event in events:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    if not self.is_menu_mode: self.is_paused = not self.is_paused
+                # Кнопка ESCAPE видалена звідси, бо вона перевіряється на початку функції
                 if event.key in [pygame.K_LEFT, pygame.K_a]: self.movement[0] = True
                 if event.key in [pygame.K_RIGHT, pygame.K_d]: self.movement[1] = True
                 if event.key in [pygame.K_UP, pygame.K_w]: self.player.jump()
@@ -594,7 +618,6 @@ class Game:
             
         self.display_2.blit(self.display, (0, 0))
         
-        # --- РОЗТЯГУВАННЯ ДО РОЗМІРУ ВІКНА ---
         scaled_display = pygame.transform.scale(self.display_2, (win_w, win_h))
         screenshake_offset = (
             (random.random() * self.screenshake - self.screenshake / 2) * scale_x, 
