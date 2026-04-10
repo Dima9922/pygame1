@@ -13,7 +13,7 @@
     "dialogue_sound": "talk.wav",
     "col_type": "coin",
     "col_value": 1,
-    "ui_icon": "coins/idle/4.png",
+    "ui_icon": "",
     "sfx_hit": "hit.wav",
     "sfx_jump": "jump.wav",
     "sfx_dash": "dash.wav",

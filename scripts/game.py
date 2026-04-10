@@ -25,16 +25,15 @@ class Game:
         self.dialogue_index = 0
         self.active_npc = None
         
-        # --- ТРЕКІНГ ПОТОЧНОЇ МУЗИКИ ---
         self.current_music_track = None 
         
-        # --- НАЛАШТУВАННЯ ТА СИСТЕМА КОНФІГІВ ---
-        self.resolutions = [(640, 360), (960, 540), (1280, 720), (1600, 900), (1920, 1080)]
+        # === ТІЛЬКИ ІДЕАЛЬНІ РОЗМІРИ ===
+        self.resolutions = [(640, 360), (1280, 720), (1920, 1080)]
         self.config = {
             "music": True, 
             "sfx": True, 
-            "show_hud": True, # Додали вимикач інтерфейсу
-            "resolution_index": 2, 
+            "show_hud": True,
+            "resolution_index": 1, # За замовчуванням 1280x720
             "fullscreen": False, 
             "pause_map": "pause.json"
         }
@@ -48,26 +47,19 @@ class Game:
         else:
             self.save_config()
             
-        # --- ЧИТАЄМО НАЗВУ ТА ІКОНКУ ГРИ ---
         project_data = {}
         if os.path.exists('data/project.json'):
             try:
-                with open('data/project.json', 'r', encoding='utf-8') as f:
-                    project_data = json.load(f)
+                with open('data/project.json', 'r', encoding='utf-8') as f: project_data = json.load(f)
             except: pass
 
         game_title = project_data.get('title', 'My Awesome Game')
         icon_path = project_data.get('icon', '')
-
-        pygame.display.set_caption(game_title) # Ставимо назву вікна
-        
+        pygame.display.set_caption(game_title)
         if icon_path and os.path.exists(icon_path):
-            try:
-                icon_img = pygame.image.load(icon_path).convert_alpha()
-                pygame.display.set_icon(icon_img) # Ставимо іконку вікна
+            try: pygame.display.set_icon(pygame.image.load(icon_path).convert_alpha())
             except: pass
         
-        # --- ІНВЕНТАР ТА ЗБЕРЕЖЕННЯ ---
         self.inventory = {'coin': 0, 'key': 0}
         self.level_start_inventory = {'coin': 0, 'key': 0} 
         
@@ -95,18 +87,16 @@ class Game:
                     else:
                         self.tile_properties[folder] = {"type": "Static Blocks", "collision": True, "is_visible": True}
                 
-        self.display = pygame.Surface((v_width, v_height), pygame.SRCALPHA)
-        self.display_2 = pygame.Surface((v_width, v_height))
+        self.logical_res = (640, 360)
+        self.window_size = (v_width, v_height) 
+        self.display = pygame.Surface(self.logical_res, pygame.SRCALPHA)
+        self.display_2 = pygame.Surface(self.logical_res)
         self.movement = [False, False]
         
-        self.assets.update({
-            'clouds': load_images('clouds'),
-        })
-        
+        self.assets.update({'clouds': load_images('clouds')})
         try:
             part_imgs = load_images('particles/particle')
-            if part_imgs:
-                self.assets['particle/particle'] = Animation(part_imgs, img_dur = 6, loop = False)
+            if part_imgs: self.assets['particle/particle'] = Animation(part_imgs, img_dur = 6, loop = False)
         except: pass
         
         entities_base_path = 'data/images/entities'
@@ -118,8 +108,7 @@ class Game:
                         action_path = os.path.join(full_ent_path, action)
                         if os.path.isdir(action_path):
                             img_dur = 4 if action in ['run', 'walk', 'slide'] else 6
-                            rel_path = f'entities/{ent}/{action}'
-                            self.assets[f'{ent}/{action}'] = Animation(load_images(rel_path), img_dur=img_dur)
+                            self.assets[f'{ent}/{action}'] = Animation(load_images(f'entities/{ent}/{action}'), img_dur=img_dur)
                         elif action.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.webp')):
                             self.assets[f'{ent}/{action}'] = load_image(f'entities/{ent}/{action}')
         
@@ -135,7 +124,6 @@ class Game:
         self.tilemap = Tilemap(self, tile_size = 16)
         
         os.makedirs('data/maps', exist_ok=True)
-        
         self.level_list = []
         map_objects = []
         
@@ -144,10 +132,7 @@ class Game:
                 with open(os.path.join('data/maps', f_name), 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     if not data.get('ignore_in_progression', False):
-                        map_objects.append({
-                            'name': f_name,
-                            'order': data.get('level_order', 999) 
-                        })
+                        map_objects.append({'name': f_name, 'order': data.get('level_order', 999)})
             except: pass
             
         map_objects.sort(key=lambda x: (x['order'], x['name']))
@@ -157,8 +142,7 @@ class Game:
         self.current_map_name = None
         
         if os.path.exists('data/maps/current_play.txt'):
-            with open('data/maps/current_play.txt', 'r') as f:
-                self.current_map_name = f.read().strip()
+            with open('data/maps/current_play.txt', 'r') as f: self.current_map_name = f.read().strip()
                 
         self.screenshake = 0
         self.level_complete = False
@@ -174,46 +158,39 @@ class Game:
     def save_config(self):
         os.makedirs('data', exist_ok=True)
         try:
-            with open('data/config.json', 'w', encoding='utf-8') as f:
-                json.dump(self.config, f, indent=4)
+            with open('data/config.json', 'w', encoding='utf-8') as f: json.dump(self.config, f, indent=4)
         except: pass
 
     def apply_display_mode(self):
         if 'PySide6' not in sys.modules: 
-            res = self.resolutions[self.config['resolution_index']]
-            flags = pygame.FULLSCREEN | pygame.SCALED if self.config['fullscreen'] else pygame.SCALED
+            res = self.resolutions[self.config.get('resolution_index', 1)]
+            flags = pygame.FULLSCREEN | pygame.SCALED if self.config['fullscreen'] else 0
             try: pygame.display.set_mode(res, flags)
             except: pygame.display.set_mode(res)
 
     def resize_display(self, new_w, new_h):
-        self.display = pygame.Surface((new_w, new_h), pygame.SRCALPHA)
-        self.display_2 = pygame.Surface((new_w, new_h))
-        
+        self.window_size = (new_w, new_h)
         if not self.is_menu_mode and getattr(self.tilemap, 'bg_path', None):
             try:
                 folder, variant = self.tilemap.bg_path.split('/')
                 if folder in self.assets and int(variant) < len(self.assets[folder]):
-                    self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], (new_w, new_h))
+                    self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], self.logical_res)
             except: pass
 
     def get_image(self, key, fallback_key):
-        if key in self.assets and self.assets[key] is not None:
-            return self.assets[key]
+        if key in self.assets and self.assets[key] is not None: return self.assets[key]
         if isinstance(key, str) and key.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.webp')):
             img = load_image(key)
             if img:
-                self.assets[key] = img
-                return img
+                self.assets[key] = img; return img
             img = load_image('entities/' + key)
             if img:
-                self.assets[key] = img
-                return img
+                self.assets[key] = img; return img
         return self.assets.get(fallback_key)
 
     def play_sound(self, key, fallback_key=None, entity_type=None):
         if not key or not pygame.mixer.get_init(): return
         if not self.config.get('sfx', True): return 
-        
         vol_percent = 60
         if entity_type and entity_type in self.tile_properties:
             vol_percent = self.tile_properties[entity_type].get('sfx_volumes', {}).get(key, 60)
@@ -227,13 +204,11 @@ class Game:
 
         sound = self.loaded_sounds.get(key)
         if sound:
-            sound.set_volume(vol_percent / 100.0)
-            sound.play()
+            sound.set_volume(vol_percent / 100.0); sound.play()
         elif fallback_key and fallback_key in self.loaded_sounds:
             f_sound = self.loaded_sounds[fallback_key]
             if f_sound:
-                f_sound.set_volume(vol_percent / 100.0)
-                f_sound.play()
+                f_sound.set_volume(vol_percent / 100.0); f_sound.play()
 
     def load_level(self, map_path):
         map_name = os.path.basename(map_path)
@@ -259,10 +234,8 @@ class Game:
         try:
             with open(map_path, 'r', encoding='utf-8') as f:
                 map_data = json.load(f)
-                
                 is_menu = map_data.get('is_menu', False)
-                if map_data.get('ui_elements') and len(map_data['ui_elements']) > 0:
-                    is_menu = True
+                if map_data.get('ui_elements') and len(map_data['ui_elements']) > 0: is_menu = True
                 
                 if is_menu:
                     self.is_menu_mode = True
@@ -271,7 +244,7 @@ class Game:
                     if bg_path:
                         folder, variant = bg_path.split('/')
                         if folder in self.assets and int(variant) < len(self.assets[folder]):
-                            self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], (640, 360))
+                            self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], self.logical_res)
                     
                     level_music = map_data.get('bg_music', None)
                     if level_music != self.current_music_track:
@@ -308,7 +281,7 @@ class Game:
             try:
                 folder, variant = self.tilemap.bg_path.split('/')
                 if folder in self.assets and int(variant) < len(self.assets[folder]):
-                    self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], self.display.get_size())
+                    self.bg_image = pygame.transform.scale(self.assets[folder][int(variant)], self.logical_res)
             except: pass
             
         for spawner in self.tilemap.extract_spawners():
@@ -351,45 +324,33 @@ class Game:
             elif preset == "Enemy":
                 self.enemies.append(Enemy(
                     self, spawner['pos'], (8, 15),
-                    anim_paths=anim_paths,
-                    spawner_type=folder,
-                    can_walk=props.get('can_walk', False),
-                    can_shoot=props.get('can_shoot', False),
-                    speed=props.get('walk_speed', 1.0),
-                    shoot_cooldown_max=props.get('shoot_cooldown', 60),
+                    anim_paths=anim_paths, spawner_type=folder,
+                    can_walk=props.get('can_walk', False), can_shoot=props.get('can_shoot', False),
+                    speed=props.get('walk_speed', 1.0), shoot_cooldown_max=props.get('shoot_cooldown', 60),
                     vision_range=props.get('vision_range', 15) * 16 
                 ))
             elif preset == "Friendly NPC":
                 self.npcs.append(NPC(
                     self, spawner['pos'], (8, 15),
-                    anim_paths=anim_paths,
-                    spawner_type=folder,
-                    can_walk=props.get('can_walk', False),
-                    speed=props.get('walk_speed', 0.5),
+                    anim_paths=anim_paths, spawner_type=folder,
+                    can_walk=props.get('can_walk', False), speed=props.get('walk_speed', 0.5),
                     dialogue_text=props.get('dialogue_text', 'Привіт!;Як справи?'),
                     dialogue_sound=props.get('dialogue_sound', 'talk.wav')
                 ))
             elif preset == "Collectible":
                 self.collectibles.append(Collectible(
                     self, spawner['pos'], (16, 16),
-                    anim_paths=anim_paths,
-                    c_type=props.get('col_type', 'coin'),
-                    value=props.get('col_value', 1),
-                    spawner_type=folder
+                    anim_paths=anim_paths, c_type=props.get('col_type', 'coin'),
+                    value=props.get('col_value', 1), spawner_type=folder
                 ))
 
-    def update(self, events, mpos_virtual=(0,0)):
+    def update(self, events, mpos_raw=(0,0)):
+        win_w, win_h = self.window_size
+        if win_w == 0 or win_h == 0: win_w, win_h = 640, 360
+        logical_mpos = (mpos_raw[0] * (640 / win_w), mpos_raw[1] * (360 / win_h))
+        
         if self.is_menu_mode:
-            scale = min(self.display.get_width() / 640, self.display.get_height() / 360)
-            offset_x = (self.display.get_width() - int(640 * scale)) // 2
-            offset_y = (self.display.get_height() - int(360 * scale)) // 2
-            
-            if scale > 0:
-                cmx = (mpos_virtual[0] - offset_x) / scale
-                cmy = (mpos_virtual[1] - offset_y) / scale
-            else:
-                cmx, cmy = 0, 0
-            
+            cmx, cmy = logical_mpos
             for event in events:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     for el in reversed(self.ui_elements):
@@ -399,8 +360,7 @@ class Game:
                             if rect.collidepoint((cmx, cmy)):
                                 action = el.get('action', 'load_map')
                                 
-                                if action == 'none':
-                                    continue 
+                                if action == 'none': continue 
                                 elif action == 'load_map':
                                     target = el.get('target', '1.json')
                                     with open('data/maps/current_play.txt', 'w') as f: f.write(target)
@@ -409,56 +369,36 @@ class Game:
                                     self.load_level(f"data/maps/{target}")
                                     return 
                                 elif action == 'quit_game':
-                                    import sys
                                     if 'PySide6' in sys.modules:
                                         from PySide6.QtWidgets import QApplication
-                                        if QApplication.instance():
-                                            QApplication.instance().quit()
-                                            return
-                                    pygame.quit()
-                                    sys.exit()
+                                        if QApplication.instance(): QApplication.instance().quit(); return
+                                    pygame.quit(); sys.exit()
                                 elif action == 'open_url':
-                                    import webbrowser
-                                    webbrowser.open(el.get('target', 'http://google.com'))
-                                    break 
+                                    import webbrowser; webbrowser.open(el.get('target', 'http://google.com')); break 
                                 elif action == 'toggle_music':
                                     self.config['music'] = not self.config['music']
-                                    if not self.config['music']: 
-                                        pygame.mixer.music.stop()
+                                    if not self.config['music']: pygame.mixer.music.stop()
                                     else:
                                         level_music = getattr(self.tilemap, 'bg_music', None)
                                         if getattr(self, 'is_menu_mode', False):
                                             try:
                                                 with open(f"data/maps/{self.current_map_name}", 'r', encoding='utf-8') as f:
-                                                    menu_data = json.load(f)
-                                                    level_music = menu_data.get('bg_music', None)
+                                                    level_music = json.load(f).get('bg_music', None)
                                             except: pass
                                         if level_music:
-                                            try: 
-                                                pygame.mixer.music.load(f"data/sfx/{level_music}")
-                                                pygame.mixer.music.play(-1)
-                                                self.current_music_track = level_music
+                                            try: pygame.mixer.music.load(f"data/sfx/{level_music}"); pygame.mixer.music.play(-1)
                                             except: pass
-                                    self.save_config()
-                                    break
+                                    self.save_config(); break
                                 elif action == 'toggle_sfx':
-                                    self.config['sfx'] = not self.config['sfx']
-                                    self.save_config()
-                                    break
+                                    self.config['sfx'] = not self.config['sfx']; self.save_config(); break
                                 elif action == 'toggle_hud':
-                                    self.config['show_hud'] = not self.config.get('show_hud', True)
-                                    self.save_config()
-                                    break
+                                    self.config['show_hud'] = not self.config.get('show_hud', True); self.save_config(); break
                                 elif action == 'cycle_resolution':
-                                    self.config['resolution_index'] = (self.config['resolution_index'] + 1) % len(self.resolutions)
-                                    self.apply_display_mode()
-                                    self.save_config()
-                                    break
+                                    self.config['resolution_index'] = (self.config.get('resolution_index', 1) + 1) % len(self.resolutions)
+                                    self.apply_display_mode(); self.save_config(); break
                                 elif action == 'toggle_fullscreen':
                                     self.config['fullscreen'] = not self.config['fullscreen']
-                                    self.apply_display_mode()
-                                    self.save_config()
-                                    break
+                                    self.apply_display_mode(); self.save_config(); break
             return
 
         if self.is_dialogue_active:
@@ -466,11 +406,9 @@ class Game:
                 if event.type == pygame.KEYDOWN and event.key in [pygame.K_e, pygame.K_RETURN, pygame.K_SPACE]:
                     self.dialogue_index += 1
                     if self.dialogue_index >= len(self.dialogue_lines):
-                        self.is_dialogue_active = False 
-                        self.active_npc = None
+                        self.is_dialogue_active = False; self.active_npc = None
                     else:
-                        if self.active_npc:
-                            self.play_sound(self.active_npc.dialogue_sound, 'talk.wav')
+                        if self.active_npc: self.play_sound(self.active_npc.dialogue_sound, 'talk.wav')
             return 
 
         self.screenshake = max(0, self.screenshake - 1)
@@ -489,18 +427,16 @@ class Game:
                 self.level_complete = False
         elif self.dead:
             self.dead += 1
-            if self.dead >= 10:
-                self.transition = min(30, self.transition + 1)
+            if self.dead >= 10: self.transition = min(30, self.transition + 1)
             if self.dead > 40:
                 if self.current_map_name:
                     self.inventory = self.level_start_inventory.copy()
                     self.load_level(f"data/maps/{self.current_map_name}")
         else:
-            if self.transition < 0:
-                self.transition += 1
+            if self.transition < 0: self.transition += 1
         
-        self.scroll[0] += (self.player.rect().centerx - self.display.get_width() / 2 - self.scroll[0]) / 30
-        self.scroll[1] += (self.player.rect().centery - self.display.get_height() / 2 - self.scroll[1]) / 30
+        self.scroll[0] += (self.player.rect().centerx - self.logical_res[0] / 2 - self.scroll[0]) / 30
+        self.scroll[1] += (self.player.rect().centery - self.logical_res[1] / 2 - self.scroll[1]) / 30
         
         self.clouds.update()
         
@@ -512,12 +448,9 @@ class Game:
                 
                 self.play_sound(self.tile_properties.get(c.spawner_type, {}).get('sfx_hit', 'hit.wav'), 'hit.wav')
                 self.collectibles.remove(c)
-                
-                for i in range(5):
-                    self.sparks.append(Spark(c.rect().center, random.random() * math.pi * 2, 1 + random.random()))
+                for i in range(5): self.sparks.append(Spark(c.rect().center, random.random() * math.pi * 2, 1 + random.random()))
 
-        for npc in self.npcs:
-            npc.update(self.tilemap, (0, 0))
+        for npc in self.npcs: npc.update(self.tilemap, (0, 0))
         for enemy in self.enemies.copy():
             kill = enemy.update(self.tilemap, (0, 0))
             if kill: self.enemies.remove(enemy)
@@ -530,17 +463,14 @@ class Game:
             projectile[2] += 1
             if self.tilemap.solid_check(projectile[0]):
                 self.projectiles.remove(projectile)
-                for i in range(4):
-                    self.sparks.append(Spark(projectile[0], random.random() - 0.5 + (math.pi if projectile[1] > 0 else 0), 2 + random.random()))
-            elif projectile[2] > 360:
-                self.projectiles.remove(projectile)
+                for i in range(4): self.sparks.append(Spark(projectile[0], random.random() - 0.5 + (math.pi if projectile[1] > 0 else 0), 2 + random.random()))
+            elif projectile[2] > 360: self.projectiles.remove(projectile)
             else:
                 proj_type = projectile[3] if len(projectile) > 3 else 'enemy'
                 if proj_type == 'enemy':
                     if abs(self.player.dashing) < 50:
                         if self.player.rect().collidepoint(projectile[0]):
-                            self.projectiles.remove(projectile)
-                            self.dead += 1
+                            self.projectiles.remove(projectile); self.dead += 1
                             self.play_sound(self.player.anim_paths.get('sfx_hit', 'hit.wav'), 'hit.wav', self.player.spawner_type)
                             self.screenshake = max(16, self.screenshake)
                 elif proj_type == 'player':
@@ -553,13 +483,10 @@ class Game:
                             
                             death_fx = enemy.anim_paths.get('die', 'particle/particle')
                             fx_key = death_fx if death_fx in self.assets else None 
-                            
                             for i in range(30):
-                                angle = random.random() * math.pi * 2
-                                speed = random.random() * 5
+                                angle = random.random() * math.pi * 2; speed = random.random() * 5
                                 self.sparks.append(Spark(enemy.rect().center, angle, 2 + random.random()))
                                 if fx_key:
-                                    # ВАЖЛИВО: self замість self.game
                                     self.particles.append(Particle(self, fx_key, enemy.rect().center, velocity = [math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame = 'random'))
                             break 
                     
@@ -571,53 +498,41 @@ class Game:
         for event in events:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    if not self.is_menu_mode:
-                        self.is_paused = not self.is_paused
-                        
+                    if not self.is_menu_mode: self.is_paused = not self.is_paused
                 if event.key in [pygame.K_LEFT, pygame.K_a]: self.movement[0] = True
                 if event.key in [pygame.K_RIGHT, pygame.K_d]: self.movement[1] = True
                 if event.key in [pygame.K_UP, pygame.K_w]: self.player.jump()
                 if event.key == pygame.K_x: self.player.dash()
                 if event.key == pygame.K_SPACE: self.player.shoot()
-                
                 if event.key in [pygame.K_e, 1059]: 
                     for npc in self.npcs:
                         if npc.interactable:
                             self.is_dialogue_active = True
                             raw_lines = npc.dialogue_text.split(';')
                             self.dialogue_lines = [line.strip() for line in raw_lines if line.strip()]
-                            if not self.dialogue_lines:
-                                self.dialogue_lines = ["..."]
-                                
-                            self.dialogue_index = 0
-                            self.active_npc = npc
+                            if not self.dialogue_lines: self.dialogue_lines = ["..."]
+                            self.dialogue_index = 0; self.active_npc = npc
                             self.movement = [False, False] 
-                            self.play_sound(npc.dialogue_sound, 'talk.wav')
-                            break
-                            
+                            self.play_sound(npc.dialogue_sound, 'talk.wav'); break
             if event.type == pygame.KEYUP:
                 if event.key in [pygame.K_LEFT, pygame.K_a]: self.movement[0] = False
                 if event.key in [pygame.K_RIGHT, pygame.K_d]: self.movement[1] = False
 
-    def draw(self, surface, mpos_virtual=(0,0)):
+    def draw(self, surface, mpos_raw=(0,0)):
+        win_w, win_h = surface.get_size()
+        if win_w == 0 or win_h == 0: win_w, win_h = 640, 360
+        scale_x = win_w / 640
+        scale_y = win_h / 360
+        logical_mpos = (mpos_raw[0] / scale_x, mpos_raw[1] / scale_y)
+        
         self.display.fill((0, 0, 0, 0))
         
         if self.is_menu_mode:
-            menu_surf = pygame.Surface((640, 360))
-            if getattr(self, 'bg_image', None):
-                menu_surf.blit(self.bg_image, (0, 0))
-            else:
-                menu_surf.fill((25, 25, 35)) 
+            menu_surf = pygame.Surface(self.logical_res)
+            if getattr(self, 'bg_image', None): menu_surf.blit(self.bg_image, (0, 0))
+            else: menu_surf.fill((25, 25, 35)) 
             
-            scale = min(self.display.get_width() / 640, self.display.get_height() / 360)
-            offset_x = (self.display.get_width() - int(640 * scale)) // 2
-            offset_y = (self.display.get_height() - int(360 * scale)) // 2
-            
-            if scale > 0:
-                cmx = (mpos_virtual[0] - offset_x) / scale
-                cmy = (mpos_virtual[1] - offset_y) / scale
-            else:
-                cmx, cmy = 0, 0
+            cmx, cmy = logical_mpos
             
             for el in self.ui_elements:
                 if el['type'] in self.assets and el['variant'] < len(self.assets[el['type']]):
@@ -629,30 +544,23 @@ class Game:
                     
                     menu_surf.blit(img, (el['pos'][0], el['pos'][1]))
                     
-                    text = el.get('text', '')
-                    action = el.get('action', '')
-                    
+                    text, action = el.get('text', ''), el.get('action', '')
                     if action == 'toggle_music': text = f"{text}: {'ON' if self.config.get('music', True) else 'OFF'}"
                     elif action == 'toggle_sfx': text = f"{text}: {'ON' if self.config.get('sfx', True) else 'OFF'}"
                     elif action == 'toggle_hud': text = f"{text}: {'ON' if self.config.get('show_hud', True) else 'OFF'}"
                     elif action == 'toggle_fullscreen': text = f"{text}: {'ON' if self.config.get('fullscreen', False) else 'OFF'}"
                     elif action == 'cycle_resolution': 
-                        res = self.resolutions[self.config.get('resolution_index', 2)]
+                        res = self.resolutions[self.config.get('resolution_index', 1)]
                         text = f"{text}: {res[0]}x{res[1]}"
                         
                     if text:
                         text_surf = self.font.render(text, True, (255, 255, 255))
                         shadow_surf = self.font.render(text, True, (0, 0, 0))
                         text_rect = text_surf.get_rect(center=(el['pos'][0] + img.get_width()/2, el['pos'][1] + img.get_height()/2))
-                        menu_surf.blit(shadow_surf, (text_rect.x + 1, text_rect.y + 1))
-                        menu_surf.blit(text_surf, text_rect)
+                        menu_surf.blit(shadow_surf, (text_rect.x + 1, text_rect.y + 1)); menu_surf.blit(text_surf, text_rect)
             
-            scaled_w, scaled_h = int(640 * scale), int(360 * scale)
-            if scaled_w > 0 and scaled_h > 0:
-                scaled_menu = pygame.transform.scale(menu_surf, (scaled_w, scaled_h))
-                self.display_2.fill((5, 5, 8))
-                self.display_2.blit(scaled_menu, (offset_x, offset_y))
-                surface.blit(self.display_2, (0, 0))
+            scaled_menu = pygame.transform.scale(menu_surf, (win_w, win_h))
+            surface.blit(scaled_menu, (0, 0))
             return
 
         if getattr(self, 'bg_image', None): self.display_2.blit(self.bg_image, (0, 0))
@@ -663,7 +571,6 @@ class Game:
         self.tilemap.render(self.display, offset = render_scroll)
         
         for c in self.collectibles: c.render(self.display, offset = render_scroll)
-        
         for npc in self.npcs: npc.render(self.display, offset = render_scroll)
         for enemy in self.enemies: enemy.render(self.display, offset = render_scroll)
         if not self.dead: self.player.render(self.display, offset = render_scroll)
@@ -673,50 +580,52 @@ class Game:
         for projectile in self.projectiles:
             img_key = projectile[4] if len(projectile) > 4 else 'projectile.png'
             img = self.get_image(img_key, 'projectile.png')
-            if img:
-                self.display.blit(img, (projectile[0][0] - img.get_width() / 2 - render_scroll[0], projectile[0][1] - img.get_height() / 2 - render_scroll[1]))
+            if img: self.display.blit(img, (projectile[0][0] - img.get_width() / 2 - render_scroll[0], projectile[0][1] - img.get_height() / 2 - render_scroll[1]))
             
         display_mask = pygame.mask.from_surface(self.display)
         display_sillhouette = display_mask.to_surface(setcolor = (0, 0, 0, 180), unsetcolor = (0, 0, 0, 0))
-        for offset in [(-1, 0), (1, 0), (0, -1), (0, 1)]: 
-            self.display_2.blit(display_sillhouette, offset)
+        for offset in [(-1, 0), (1, 0), (0, -1), (0, 1)]: self.display_2.blit(display_sillhouette, offset)
             
         if getattr(self, 'transition', 0):
-            transition_surf = pygame.Surface(self.display.get_size())
-            pygame.draw.circle(transition_surf, (255, 255, 255), (self.display.get_width() // 2, self.display.get_height() // 2), (30 - abs(self.transition)) * 8)
+            transition_surf = pygame.Surface(self.logical_res)
+            pygame.draw.circle(transition_surf, (255, 255, 255), (self.logical_res[0] // 2, self.logical_res[1] // 2), (30 - abs(self.transition)) * 8)
             transition_surf.set_colorkey((255, 255, 255))
             self.display.blit(transition_surf, (0, 0))
             
         self.display_2.blit(self.display, (0, 0))
         
-        screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
-        surface.blit(self.display_2, screenshake_offset)
+        # --- РОЗТЯГУВАННЯ ДО РОЗМІРУ ВІКНА ---
+        scaled_display = pygame.transform.scale(self.display_2, (win_w, win_h))
+        screenshake_offset = (
+            (random.random() * self.screenshake - self.screenshake / 2) * scale_x, 
+            (random.random() * self.screenshake - self.screenshake / 2) * scale_y
+        )
+        surface.blit(scaled_display, screenshake_offset)
 
         if self.config.get('show_hud', True) and not self.is_menu_mode:
-            win_w, win_h = surface.get_size()
-            scale_x = win_w / 640
             ui_font_size = max(16, int(18 * scale_x))
             ui_font = pygame.font.SysFont('arial', ui_font_size, bold=True)
-            
-            base_x, base_y = max(10, int(10*scale_x)), max(10, int(10*scale_x))
-            current_x = base_x
+            current_x = max(10, int(10*scale_x))
+            base_y = max(10, int(10*scale_y))
             
             for item_type, amount in self.inventory.items():
                 icon = None
                 for spawner_name, props in self.tile_properties.items():
                     if props.get('preset') == 'Collectible' and props.get('col_type') == item_type:
-                        anim_path = props.get('anim_idle')
-                        if anim_path in self.assets:
-                            asset = self.assets[anim_path]
-                            icon = asset.images[0] if hasattr(asset, 'images') else asset
+                        ui_path = props.get('ui_icon', '')
+                        if ui_path: icon = self.get_image(ui_path, None)
+                        if icon is None:
+                            anim_path = props.get('anim_idle')
+                            if anim_path in self.assets:
+                                asset = self.assets[anim_path]
+                                icon = asset.images[0] if hasattr(asset, 'images') else asset
                         if icon is None and spawner_name in self.assets:
                             asset = self.assets[spawner_name]
                             icon = asset[0] if isinstance(asset, list) else asset
                         break
                         
                 if icon is not None and (amount > 0 or item_type == 'coin'):
-                    icon_w = int(icon.get_width() * scale_x * 1.5)
-                    icon_h = int(icon.get_height() * scale_x * 1.5)
+                    icon_w, icon_h = int(icon.get_width() * scale_x * 1.5), int(icon.get_height() * scale_y * 1.5)
                     scaled_icon = pygame.transform.scale(icon, (icon_w, icon_h))
                     surface.blit(scaled_icon, (current_x, base_y))
                     
@@ -724,19 +633,17 @@ class Game:
                     text_surf = ui_font.render(f" x {amount}", True, (255, 255, 255))
                     shadow = ui_font.render(f" x {amount}", True, (0, 0, 0))
                     
-                    surface.blit(shadow, (text_x + 2, base_y + 2))
-                    surface.blit(text_surf, (text_x, base_y))
+                    surface.blit(shadow, (text_x + 2, base_y + 2)); surface.blit(text_surf, (text_x, base_y))
                     current_x = text_x + text_surf.get_width() + int(20 * scale_x)
 
         if self.is_paused:
-            overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+            overlay = pygame.Surface((win_w, win_h), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
             surface.blit(overlay, (0, 0))
             
             pause_ui_elements = []
             pause_map_name = self.config.get('pause_map', 'pause.json')
             pause_path = f'data/maps/{pause_map_name}'
-            
             if os.path.exists(pause_path):
                 try:
                     with open(pause_path, 'r', encoding='utf-8') as f:
@@ -745,45 +652,29 @@ class Game:
                             pause_ui_elements = data.get('ui_elements', [])
                 except: pass
             
-            big_font_size = max(18, int(18 * scale_x)) 
-            big_font = pygame.font.SysFont('arial', big_font_size, bold=True)
+            big_font = pygame.font.SysFont('arial', max(18, int(18 * scale_x)), bold=True)
             
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     for el in reversed(pause_ui_elements):
-                        scale_y = win_h / 360
-                        folder = el['type']
-                        var = el['variant']
-                        if folder in self.assets and var < len(self.assets[folder]):
-                            orig_img = self.assets[folder][var]
-                            orig_w, orig_h = orig_img.get_size()
-                            ex, ey = el['pos']
-                            final_x, final_y = ex * scale_x, ey * scale_y
-                            final_w, final_h = orig_w * scale_x, orig_h * scale_y
+                        if el['type'] in self.assets and el['variant'] < len(self.assets[el['type']]):
+                            orig_img = self.assets[el['type']][el['variant']]
+                            final_x, final_y = el['pos'][0] * scale_x, el['pos'][1] * scale_y
+                            final_w, final_h = orig_img.get_width() * scale_x, orig_img.get_height() * scale_y
                             rect = pygame.Rect(final_x, final_y, final_w, final_h)
-                            if rect.collidepoint(mpos_virtual):
+                            if rect.collidepoint(mpos_raw):
                                 action = el.get('action', 'resume_game')
-                                
-                                if action == 'none':
-                                    continue
-                                elif action == 'resume_game': 
-                                    self.is_paused = False
-                                    break
+                                if action == 'none': continue
+                                elif action == 'resume_game': self.is_paused = False; break
                                 elif action == 'load_map':
                                     target = el.get('target', 'menu.json')
                                     with open('data/maps/current_play.txt', 'w') as f: f.write(target)
-                                    self.load_level(f"data/maps/{target}")
-                                    self.is_paused = False
-                                    break
+                                    self.load_level(f"data/maps/{target}"); self.is_paused = False; break
                                 elif action == 'quit_game':
-                                    import sys
                                     if 'PySide6' in sys.modules:
                                         from PySide6.QtWidgets import QApplication
-                                        if QApplication.instance():
-                                            QApplication.instance().quit()
-                                            return
-                                    pygame.quit()
-                                    sys.exit()
+                                        if QApplication.instance(): QApplication.instance().quit(); return
+                                    pygame.quit(); sys.exit()
                                 elif action == 'toggle_music':
                                     self.config['music'] = not self.config['music']
                                     if not self.config['music']: pygame.mixer.music.stop()
@@ -791,54 +682,37 @@ class Game:
                                         if getattr(self.tilemap, 'bg_music', None):
                                             try: pygame.mixer.music.play(-1)
                                             except: pass
-                                    self.save_config()
-                                    break
+                                    self.save_config(); break
                                 elif action == 'toggle_sfx':
-                                    self.config['sfx'] = not self.config['sfx']
-                                    self.save_config()
-                                    break
+                                    self.config['sfx'] = not self.config['sfx']; self.save_config(); break
                                 elif action == 'toggle_hud':
-                                    self.config['show_hud'] = not self.config.get('show_hud', True)
-                                    self.save_config()
-                                    break
+                                    self.config['show_hud'] = not self.config.get('show_hud', True); self.save_config(); break
                                 elif action == 'cycle_resolution':
-                                    self.config['resolution_index'] = (self.config['resolution_index'] + 1) % len(self.resolutions)
-                                    self.apply_display_mode()
-                                    self.save_config()
-                                    break
+                                    self.config['resolution_index'] = (self.config.get('resolution_index', 1) + 1) % len(self.resolutions)
+                                    self.apply_display_mode(); self.save_config(); break
                                 elif action == 'toggle_fullscreen':
                                     self.config['fullscreen'] = not self.config['fullscreen']
-                                    self.apply_display_mode()
-                                    self.save_config()
-                                    break
+                                    self.apply_display_mode(); self.save_config(); break
 
             for el in pause_ui_elements:
-                scale_y = win_h / 360
-                folder = el['type']
-                var = el['variant']
-                ex, ey = el['pos']
-                if folder in self.assets and var < len(self.assets[folder]):
-                    orig_img = self.assets[folder][var]
-                    orig_w, orig_h = orig_img.get_size()
-                    final_x, final_y = ex * scale_x, ey * scale_y
-                    final_w, final_h = int(orig_w * scale_x), int(orig_h * scale_y)
+                if el['type'] in self.assets and el['variant'] < len(self.assets[el['type']]):
+                    orig_img = self.assets[el['type']][el['variant']]
+                    final_x, final_y = el['pos'][0] * scale_x, el['pos'][1] * scale_y
+                    final_w, final_h = int(orig_img.get_width() * scale_x), int(orig_img.get_height() * scale_y)
                     scaled_btn_img = pygame.transform.scale(orig_img, (final_w, final_h))
                     rect = pygame.Rect(final_x, final_y, final_w, final_h)
                     
-                    if el.get('action', 'none') != 'none' and rect.collidepoint(mpos_virtual):
+                    if el.get('action', 'none') != 'none' and rect.collidepoint(mpos_raw):
                         pygame.draw.rect(surface, (255, 204, 0), rect.inflate(4*scale_x, 4*scale_y), max(2, int(2*scale_x)), border_radius=int(4*scale_x))
-                    
                     surface.blit(scaled_btn_img, (final_x, final_y))
                     
-                    text = el.get('text', '')
-                    action = el.get('action', '')
-                    
+                    text, action = el.get('text', ''), el.get('action', '')
                     if action == 'toggle_music': text = f"{text}: {'ON' if self.config.get('music', True) else 'OFF'}"
                     elif action == 'toggle_sfx': text = f"{text}: {'ON' if self.config.get('sfx', True) else 'OFF'}"
                     elif action == 'toggle_hud': text = f"{text}: {'ON' if self.config.get('show_hud', True) else 'OFF'}"
                     elif action == 'toggle_fullscreen': text = f"{text}: {'ON' if self.config.get('fullscreen', False) else 'OFF'}"
                     elif action == 'cycle_resolution': 
-                        res = self.resolutions[self.config.get('resolution_index', 2)]
+                        res = self.resolutions[self.config.get('resolution_index', 1)]
                         text = f"{text}: {res[0]}x{res[1]}"
                         
                     if text:
@@ -849,24 +723,15 @@ class Game:
                         surface.blit(text_surf, text_rect)
 
         if self.is_dialogue_active and self.dialogue_index < len(self.dialogue_lines):
-            scale_y = win_h / 360
-            
-            box_w = int(500 * scale_x)
-            box_h = int(100 * scale_y)
-            box_x = (win_w - box_w) // 2
-            box_y = win_h - box_h - int(30 * scale_y)
+            box_w, box_h = int(500 * scale_x), int(100 * scale_y)
+            box_x, box_y = (win_w - box_w) // 2, win_h - box_h - int(30 * scale_y)
             
             pygame.draw.rect(surface, (25, 25, 35), (box_x, box_y, box_w, box_h), border_radius=int(8*scale_x))
             pygame.draw.rect(surface, (255, 204, 0), (box_x, box_y, box_w, box_h), max(2, int(2*scale_x)), border_radius=int(8*scale_x))
             
-            big_font_size = max(18, int(18 * scale_x))
-            big_font = pygame.font.SysFont('arial', big_font_size, bold=True)
-            
-            current_line = self.dialogue_lines[self.dialogue_index]
-            
-            text_surf = big_font.render(current_line, True, (255, 255, 255))
-            text_rect = text_surf.get_rect(center=(box_x + box_w//2, box_y + box_h//2))
-            surface.blit(text_surf, text_rect)
+            big_font = pygame.font.SysFont('arial', max(18, int(18 * scale_x)), bold=True)
+            text_surf = big_font.render(self.dialogue_lines[self.dialogue_index], True, (255, 255, 255))
+            surface.blit(text_surf, text_surf.get_rect(center=(box_x + box_w//2, box_y + box_h//2)))
             
             small_font = pygame.font.SysFont('arial', max(12, int(12 * scale_x)))
             hint_surf = small_font.render("[E] Далі", True, (150, 150, 150))

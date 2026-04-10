@@ -1,7 +1,8 @@
 {
     "music": true,
     "sfx": true,
-    "resolution_index": 3,
+    "show_hud": true,
+    "resolution_index": 4,
     "fullscreen": true,
     "pause_map": "pause.json"
 }
